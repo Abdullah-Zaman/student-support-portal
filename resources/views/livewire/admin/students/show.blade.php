@@ -1,3 +1,7 @@
+@php
+    $routePrefix = $this->isSuperAdmin ? 'super-admin.' : 'admin.';
+@endphp
+
 <div class="flex flex-col gap-6 py-7">
     <x-page-header :title="$student->user->name" :subtitle="$student->registration_no">
         <x-slot:actions>
@@ -37,7 +41,7 @@
                     <ul class="m-0 flex flex-col">
                         @foreach ($this->applications as $application)
                             <li class="flex items-center justify-between gap-3 border-t border-border-soft px-[22px] py-3.5 first:border-t-0">
-                                <a href="{{ route('admin.applications.show', $application) }}" wire:navigate class="flex flex-col gap-0.5 no-underline">
+                                <a href="{{ route($routePrefix.'applications.show', $application) }}" wire:navigate class="flex flex-col gap-0.5 no-underline">
                                     <span class="font-semibold text-ink">{{ $application->subject }}</span>
                                     <span class="text-[13px] text-subtle tabular-nums">{{ $application->application_no }} &middot; {{ $application->category->name }} &middot; {{ $application->created_at->format('j M Y') }}</span>
                                 </a>
@@ -56,6 +60,25 @@
                     <flux:button variant="primary" class="self-end" wire:click="updateName">{{ __('Save') }}</flux:button>
                 </div>
             </x-panel>
+
+            @if ($this->isSuperAdmin)
+                <x-panel :title="__('Edit profile')">
+                    <div class="flex flex-col gap-3 px-[22px] py-4">
+                        <flux:select wire:model="program" :label="__('Program')">
+                            @foreach ($this->programs as $code => $label)
+                                <flux:select.option :value="$code">{{ $label }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:select wire:model="current_semester" :label="__('Current semester')">
+                            @foreach (range(1, 8) as $semester)
+                                <flux:select.option :value="$semester">{{ $semester }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                        <flux:input wire:model="batch" :label="__('Batch')" placeholder="F22" />
+                        <flux:button variant="primary" class="self-end" wire:click="updateProfile">{{ __('Save') }}</flux:button>
+                    </div>
+                </x-panel>
+            @endif
 
             <x-panel :title="__('Account')">
                 <div class="flex flex-col gap-3 px-[22px] py-4">

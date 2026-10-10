@@ -70,6 +70,77 @@ test('an admin officer can reactivate a suspended student', function () {
     expect($student->refresh()->status)->toBe(UserStatus::Active);
 });
 
+test('a super admin can edit a student\'s program, semester and batch', function () {
+    $department = Department::factory()->create();
+    $superAdmin = createSuperAdmin();
+    $student = createStudentUser($department);
+    $student->student->update(['registration_no' => 'SU92-BSDSM-F23-045', 'program' => config('students.programs')['BSDS']]);
+    $studentProfile = $student->student;
+
+    Livewire::actingAs($superAdmin)
+        ->test(Show::class, ['student' => $studentProfile])
+        ->set('program', 'BSDS')
+        ->set('current_semester', 5)
+        ->set('batch', 'F23')
+        ->call('updateProfile')
+        ->assertHasNoErrors();
+
+    $studentProfile->refresh();
+    expect($studentProfile->program)->toBe(config('students.programs')['BSDS']);
+    expect($studentProfile->current_semester)->toBe(5);
+});
+
+test('an admin officer cannot edit a student\'s program, semester or batch', function () {
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    $student = createStudentUser($department);
+    $studentProfile = $student->student;
+
+    Livewire::actingAs($admin)
+        ->test(Show::class, ['student' => $studentProfile])
+        ->set('program', 'BSDS')
+        ->call('updateProfile')
+        ->assertForbidden();
+});
+
+test('the program must stay consistent with the registration number when a super admin edits a student', function () {
+    $department = Department::factory()->create();
+    $superAdmin = createSuperAdmin();
+    $student = createStudentUser($department);
+    $student->student->update(['registration_no' => 'SU92-BSSEM-F22-171']);
+    $studentProfile = $student->student;
+
+    Livewire::actingAs($superAdmin)
+        ->test(Show::class, ['student' => $studentProfile])
+        ->set('program', 'BSDS')
+        ->set('current_semester', 5)
+        ->set('batch', 'F22')
+        ->call('updateProfile')
+        ->assertHasErrors(['program']);
+});
+
+test('changing a student\'s current semester never changes semester_at_submission on existing applications', function () {
+    $department = Department::factory()->create();
+    $superAdmin = createSuperAdmin();
+    $student = createStudentUser($department);
+    $student->student->update(['current_semester' => 3]);
+    $studentProfile = $student->student;
+
+    $application = createApplicationInDepartment($department, $student);
+    $application->update(['semester_at_submission' => 3]);
+
+    Livewire::actingAs($superAdmin)
+        ->test(Show::class, ['student' => $studentProfile])
+        ->set('program', (string) array_search($studentProfile->program, config('students.programs'), true))
+        ->set('current_semester', 6)
+        ->set('batch', $studentProfile->batch)
+        ->call('updateProfile')
+        ->assertHasNoErrors();
+
+    expect($studentProfile->refresh()->current_semester)->toBe(6);
+    expect($application->refresh()->semester_at_submission)->toBe(3);
+});
+
 test('correcting a student\'s name is logged in the activity log and shows a success message', function () {
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);

@@ -89,3 +89,33 @@ test('a successful login updates last_login_at and writes an activity log entry'
         ->where('description', 'login')
         ->exists())->toBeTrue();
 });
+
+test('a failed login with a wrong password is recorded in the activity log, without the password', function () {
+    $user = User::factory()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'wrong-password',
+    ]);
+
+    $activity = Activity::query()->where('description', 'login_failed')->latest('id')->first();
+
+    // Fortify's Failed event never carries a resolved user (even for a
+    // wrong password against a real account), so there is no causer here.
+    expect($activity)->not->toBeNull();
+    expect($activity->properties->get('email'))->toBe($user->email);
+    expect($activity->properties->has('password'))->toBeFalse();
+});
+
+test('a failed login with an unknown email is still recorded, without a causer', function () {
+    $this->post(route('login.store'), [
+        'email' => 'nobody@superior.edu.pk',
+        'password' => 'whatever',
+    ]);
+
+    $activity = Activity::query()->where('description', 'login_failed')->latest('id')->first();
+
+    expect($activity)->not->toBeNull();
+    expect($activity->causer_id)->toBeNull();
+    expect($activity->properties->get('email'))->toBe('nobody@superior.edu.pk');
+});

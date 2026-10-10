@@ -4,9 +4,12 @@ namespace App\Providers;
 
 use App\Listeners\ActivateVerifiedUser;
 use App\Listeners\LogOutOtherSessionsOnPasswordReset;
+use App\Listeners\RecordFailedLogin;
 use App\Listeners\RecordSuccessfulLogin;
+use App\Policies\ActivityPolicy;
 use App\Support\BrandedMailMessage;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Verified;
@@ -16,8 +19,10 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -36,8 +41,11 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
+        Gate::policy(Activity::class, ActivityPolicy::class);
+
         Event::listen(Verified::class, ActivateVerifiedUser::class);
         Event::listen(Login::class, RecordSuccessfulLogin::class);
+        Event::listen(Failed::class, RecordFailedLogin::class);
         Event::listen(PasswordReset::class, LogOutOtherSessionsOnPasswordReset::class);
 
         VerifyEmail::toMailUsing(function ($notifiable, string $url) {

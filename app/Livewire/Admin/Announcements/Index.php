@@ -3,12 +3,16 @@
 namespace App\Livewire\Admin\Announcements;
 
 use App\Concerns\AnnouncementValidationRules;
+use App\Enums\RoleName;
 use App\Models\Announcement;
+use App\Models\Department;
 use App\Models\Scopes\AdminDepartmentScope;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -35,9 +39,26 @@ class Index extends Component
 
     public bool $is_active = true;
 
+    public string $department_id = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', Announcement::class);
+    }
+
+    #[Computed]
+    public function isSuperAdmin(): bool
+    {
+        return Auth::user()->hasRole(RoleName::SuperAdmin->value);
+    }
+
+    /**
+     * @return Collection<int, Department>
+     */
+    #[Computed]
+    public function departments(): Collection
+    {
+        return Department::query()->orderBy('name')->get();
     }
 
     /**
@@ -46,14 +67,14 @@ class Index extends Component
     #[Computed]
     public function announcements(): LengthAwarePaginator
     {
-        return Announcement::query()->latest()->paginate(15);
+        return Announcement::query()->with('department')->latest()->paginate(15);
     }
 
     public function startCreate(): void
     {
         $this->authorize('create', Announcement::class);
 
-        $this->reset(['editing_id', 'title', 'body', 'image', 'attachment', 'publish_at', 'expires_at', 'is_active']);
+        $this->reset(['editing_id', 'title', 'body', 'image', 'attachment', 'publish_at', 'expires_at', 'is_active', 'department_id']);
         $this->is_active = true;
         $this->resetValidation();
 
@@ -73,6 +94,7 @@ class Index extends Component
         $this->publish_at = $announcement->publish_at?->format('Y-m-d\TH:i') ?? '';
         $this->expires_at = $announcement->expires_at?->format('Y-m-d\TH:i') ?? '';
         $this->is_active = $announcement->is_active;
+        $this->department_id = (string) $announcement->department_id;
         $this->resetValidation();
 
         $this->modal('announcement-form')->show();
@@ -92,6 +114,9 @@ class Index extends Component
             'publish_at' => $this->publishAtRules(),
             'expires_at' => $this->expiresAtRules($this->publish_at ?: null),
             'is_active' => ['boolean'],
+            'department_id' => $this->isSuperAdmin()
+                ? ['required', Rule::exists(Department::class, 'id')]
+                : ['nullable'],
         ], $this->announcementMessages());
 
         $attributes = [
@@ -102,9 +127,13 @@ class Index extends Component
             'is_active' => $validated['is_active'],
         ];
 
+        if ($this->isSuperAdmin()) {
+            $attributes['department_id'] = $validated['department_id'];
+        }
+
         if ($announcement === null) {
             $announcement = Announcement::create(array_merge($attributes, [
-                'department_id' => Auth::user()->department_id,
+                'department_id' => $attributes['department_id'] ?? Auth::user()->department_id,
                 'created_by' => Auth::id(),
             ]));
         } else {

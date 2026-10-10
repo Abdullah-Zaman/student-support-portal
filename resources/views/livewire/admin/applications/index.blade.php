@@ -1,11 +1,26 @@
+@php
+    $routePrefix = $this->isSuperAdmin ? 'super-admin.' : 'admin.';
+@endphp
+
 <div class="flex flex-col gap-6 py-7">
-    <x-page-header :title="__('Applications')" :subtitle="__('Every application submitted to your department.')" />
+    <x-page-header :title="__('Applications')" :subtitle="$this->isSuperAdmin ? __('Every application across all departments.') : __('Every application submitted to your department.')" />
 
     <div class="flex flex-col gap-4 rounded-[14px] border border-border bg-white px-6 py-5">
         <div class="flex flex-wrap items-end gap-4">
             <div class="flex min-w-0 flex-1 basis-64 flex-col gap-1">
                 <flux:input wire:model.live.debounce.400ms="search" :label="__('Search')" icon="magnifying-glass" :placeholder="__('Application no., student name or reg. no.')" />
             </div>
+
+            @if ($this->isSuperAdmin)
+                <div class="flex min-w-0 flex-1 basis-48 flex-col gap-1">
+                    <flux:select wire:model.live="department_id" :label="__('Department')">
+                        <flux:select.option value="">{{ __('All departments') }}</flux:select.option>
+                        @foreach ($this->departments as $department)
+                            <flux:select.option :value="(string) $department->id">{{ $department->name }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+            @endif
 
             <div class="flex min-w-0 flex-1 basis-40 flex-col gap-1">
                 <flux:select wire:model.live="status" :label="__('Status')">
@@ -93,7 +108,7 @@
                         @foreach ($this->applications as $application)
                             <tr class="border-t border-border-soft">
                                 <td class="px-[22px] py-3.5">
-                                    <a href="{{ route('admin.applications.show', $application) }}" wire:navigate class="flex flex-col gap-0.5 no-underline">
+                                    <a href="{{ route($routePrefix.'applications.show', $application) }}" wire:navigate class="flex flex-col gap-0.5 no-underline">
                                         <span class="flex items-center gap-2">
                                             <span class="font-semibold text-ink">{{ $application->subject }}</span>
                                             @if ($application->unreadStudentResponses->isNotEmpty())
@@ -114,7 +129,7 @@
                                 <td class="px-3 py-3.5"><x-status-badge :status="$application->status" /></td>
                                 <td class="px-3 py-3.5 whitespace-nowrap text-ink-soft">{{ $application->created_at->format('j M, g:i A') }}</td>
                                 <td class="px-[22px] py-3.5 text-right">
-                                    <flux:button :href="route('admin.applications.show', $application)" variant="ghost" size="sm" wire:navigate>{{ __('Open') }}</flux:button>
+                                    <flux:button :href="route($routePrefix.'applications.show', $application)" variant="ghost" size="sm" wire:navigate>{{ __('Open') }}</flux:button>
                                 </td>
                             </tr>
                         @endforeach

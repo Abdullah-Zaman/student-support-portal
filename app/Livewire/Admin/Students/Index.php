@@ -2,11 +2,15 @@
 
 namespace App\Livewire\Admin\Students;
 
+use App\Enums\RoleName;
 use App\Enums\UserStatus;
+use App\Models\Department;
 use App\Models\Student;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -31,6 +35,9 @@ class Index extends Component
     #[Url]
     public string $status = '';
 
+    #[Url]
+    public string $department_id = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', Student::class);
@@ -38,14 +45,14 @@ class Index extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['search', 'program', 'semester', 'status'], true)) {
+        if (in_array($property, ['search', 'program', 'semester', 'status', 'department_id'], true)) {
             $this->resetPage();
         }
     }
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'program', 'semester', 'status']);
+        $this->reset(['search', 'program', 'semester', 'status', 'department_id']);
         $this->resetPage();
     }
 
@@ -55,7 +62,23 @@ class Index extends Component
         return $this->search !== ''
             || $this->program !== ''
             || $this->semester !== ''
-            || $this->status !== '';
+            || $this->status !== ''
+            || $this->department_id !== '';
+    }
+
+    #[Computed]
+    public function isSuperAdmin(): bool
+    {
+        return Auth::user()->hasRole(RoleName::SuperAdmin->value);
+    }
+
+    /**
+     * @return Collection<int, Department>
+     */
+    #[Computed]
+    public function departments(): Collection
+    {
+        return Department::query()->orderBy('name')->get();
     }
 
     /**
@@ -65,7 +88,7 @@ class Index extends Component
     public function students(): LengthAwarePaginator
     {
         return Student::query()
-            ->with('user')
+            ->with('user.department')
             ->when($this->search !== '', function (Builder $query) {
                 $query->where(function (Builder $query) {
                     $query->where('registration_no', 'like', '%'.$this->search.'%')
@@ -78,6 +101,7 @@ class Index extends Component
             ->when($this->program !== '', fn (Builder $query) => $query->where('program', $this->program))
             ->when($this->semester !== '', fn (Builder $query) => $query->where('current_semester', $this->semester))
             ->when($this->status !== '', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('status', $this->status)))
+            ->when($this->isSuperAdmin() && $this->department_id !== '', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('department_id', $this->department_id)))
             ->orderBy('registration_no')
             ->paginate(15);
     }

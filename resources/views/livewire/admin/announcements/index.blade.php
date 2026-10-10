@@ -1,5 +1,5 @@
 <div class="flex flex-col gap-6 py-7">
-    <x-page-header :title="__('Announcements')" :subtitle="__('Visible to every student in your department.')">
+    <x-page-header :title="__('Announcements')" :subtitle="$this->isSuperAdmin ? __('Visible to students of each announcement\'s department.') : __('Visible to every student in your department.')">
         <x-slot:actions>
             <flux:button variant="primary" icon="plus" wire:click="startCreate">{{ __('New announcement') }}</flux:button>
         </x-slot:actions>
@@ -14,6 +14,9 @@
                     <thead>
                         <tr class="text-left text-xs tracking-[0.06em] text-subtle uppercase">
                             <th class="px-[22px] py-3 font-semibold">{{ __('Title') }}</th>
+                            @if ($this->isSuperAdmin)
+                                <th class="px-3 py-3 font-semibold">{{ __('Department') }}</th>
+                            @endif
                             <th class="px-3 py-3 font-semibold">{{ __('Status') }}</th>
                             <th class="px-3 py-3 font-semibold">{{ __('Publishes') }}</th>
                             <th class="px-3 py-3 font-semibold">{{ __('Expires') }}</th>
@@ -34,6 +37,9 @@
                                 <td class="px-[22px] py-3.5">
                                     <span class="font-semibold text-ink">{{ $announcement->title }}</span>
                                 </td>
+                                @if ($this->isSuperAdmin)
+                                    <td class="px-3 py-3.5 text-ink-soft">{{ $announcement->department->name }}</td>
+                                @endif
                                 <td class="px-3 py-3.5"><flux:badge :color="$statusColor">{{ __($announcement->statusLabel()) }}</flux:badge></td>
                                 <td class="px-3 py-3.5 whitespace-nowrap text-ink-soft">{{ $announcement->publish_at?->format('j M Y, g:i A') ?? __('Immediately') }}</td>
                                 <td class="px-3 py-3.5 whitespace-nowrap text-ink-soft">{{ $announcement->expires_at?->format('j M Y, g:i A') ?? __('Never') }}</td>
@@ -63,6 +69,15 @@
             class="flex flex-col gap-5"
         >
             <flux:heading size="lg">{{ $editing_id ? __('Edit announcement') : __('New announcement') }}</flux:heading>
+
+            @if ($this->isSuperAdmin)
+                <flux:select wire:model="department_id" :label="__('Department')">
+                    <flux:select.option value="">{{ __('Select a department') }}</flux:select.option>
+                    @foreach ($this->departments as $department)
+                        <flux:select.option :value="(string) $department->id">{{ $department->name }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            @endif
 
             <flux:input wire:model="title" :label="__('Title')" maxlength="150" />
 

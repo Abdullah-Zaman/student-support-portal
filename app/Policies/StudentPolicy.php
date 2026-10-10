@@ -70,6 +70,15 @@ class StudentPolicy
         return false;
     }
 
+    /**
+     * Editing program/current_semester/batch for any department's student
+     * is Super Admin only — deliberately not extended to Admin Officer.
+     */
+    public function updateProfile(User $user, Student $student): bool
+    {
+        return $user->hasRole(RoleName::SuperAdmin->value);
+    }
+
     private function managedBy(User $user, Student $student): bool
     {
         if ($user->hasRole(RoleName::SuperAdmin->value)) {

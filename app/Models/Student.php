@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */
-    use HasFactory, ScopedToAdminDepartmentViaUser;
+    use HasFactory, LogsActivity, ScopedToAdminDepartmentViaUser;
 
     protected $fillable = [
         'user_id',
@@ -22,6 +24,13 @@ class Student extends Model
         'current_semester',
         'batch',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['program', 'current_semester', 'batch'])
+            ->logOnlyDirty();
+    }
 
     /**
      * The stored batch code (e.g. "F22") as a readable label (e.g. "Fall 2022").

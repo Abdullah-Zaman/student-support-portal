@@ -4,12 +4,15 @@ namespace App\Livewire\Admin\Applications;
 
 use App\Enums\ApplicationPriority;
 use App\Enums\ApplicationStatus;
+use App\Enums\RoleName;
 use App\Models\Application;
 use App\Models\ApplicationCategory;
+use App\Models\Department;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
@@ -44,6 +47,9 @@ class Index extends Component
     public string $date_to = '';
 
     #[Url]
+    public string $department_id = '';
+
+    #[Url]
     public string $sort = 'created_at';
 
     #[Url]
@@ -56,7 +62,7 @@ class Index extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to'], true)) {
+        if (in_array($property, ['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id'], true)) {
             $this->resetPage();
         }
     }
@@ -73,7 +79,7 @@ class Index extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to']);
+        $this->reset(['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id']);
         $this->resetPage();
     }
 
@@ -86,7 +92,25 @@ class Index extends Component
             || $this->category_id !== ''
             || $this->semester !== ''
             || $this->date_from !== ''
-            || $this->date_to !== '';
+            || $this->date_to !== ''
+            || $this->department_id !== '';
+    }
+
+    #[Computed]
+    public function isSuperAdmin(): bool
+    {
+        return Auth::user()->hasRole(RoleName::SuperAdmin->value);
+    }
+
+    /**
+     * Only meaningful for Super Admin, but cheap enough to always compute.
+     *
+     * @return Collection<int, Department>
+     */
+    #[Computed]
+    public function departments(): Collection
+    {
+        return Department::query()->orderBy('name')->get();
     }
 
     /**
@@ -109,7 +133,8 @@ class Index extends Component
             ->when($this->category_id !== '', fn (Builder $query) => $query->where('category_id', $this->category_id))
             ->when($this->semester !== '', fn (Builder $query) => $query->where('semester_at_submission', $this->semester))
             ->when($this->date_from !== '', fn (Builder $query) => $query->whereDate('created_at', '>=', $this->date_from))
-            ->when($this->date_to !== '', fn (Builder $query) => $query->whereDate('created_at', '<=', $this->date_to));
+            ->when($this->date_to !== '', fn (Builder $query) => $query->whereDate('created_at', '<=', $this->date_to))
+            ->when($this->isSuperAdmin() && $this->department_id !== '', fn (Builder $query) => $query->where('department_id', $this->department_id));
 
         if ($this->sort === 'priority') {
             $query->orderByPrioritySeverity($this->direction);
@@ -126,7 +151,10 @@ class Index extends Component
     #[Computed]
     public function categories(): Collection
     {
-        return ApplicationCategory::query()->orderBy('sort_order')->get();
+        return ApplicationCategory::query()
+            ->when($this->isSuperAdmin() && $this->department_id !== '', fn (Builder $query) => $query->where('department_id', $this->department_id))
+            ->orderBy('sort_order')
+            ->get();
     }
 
     /**

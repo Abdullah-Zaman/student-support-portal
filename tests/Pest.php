@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -23,6 +24,12 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(function () {
+        // The array cache store persists across tests in the same
+        // process; Setting::get()/set() cache forever, so a value set in
+        // one test would otherwise leak into the next.
+        Cache::flush();
+    })
     ->in('Feature');
 
 /*

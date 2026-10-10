@@ -45,6 +45,26 @@ test('an admin officer only sees applications from their own department', functi
     expect($ownApplication)->not->toBeNull();
 });
 
+test('a super admin sees applications from every department and can filter to one', function () {
+    $departmentA = Department::factory()->create();
+    $departmentB = Department::factory()->create();
+    $superAdmin = createSuperAdmin();
+
+    $applicationA = createApplicationInDepartment($departmentA, createStudentUser($departmentA));
+    $applicationA->update(['subject' => 'Department A application']);
+
+    $applicationB = createApplicationInDepartment($departmentB, createStudentUser($departmentB));
+    $applicationB->update(['subject' => 'Department B application']);
+
+    Livewire::actingAs($superAdmin)
+        ->test(Index::class)
+        ->assertSee('Department A application')
+        ->assertSee('Department B application')
+        ->set('department_id', (string) $departmentA->id)
+        ->assertSee('Department A application')
+        ->assertDontSee('Department B application');
+});
+
 test('search matches by student name', function () {
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);

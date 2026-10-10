@@ -56,6 +56,36 @@ test('creating and editing an announcement with files stores them and keeps the 
     Storage::disk('local')->assertExists($announcement->attachment_path);
 });
 
+test('a super admin must choose a department when creating an announcement', function () {
+    $superAdmin = createSuperAdmin();
+
+    Livewire::actingAs($superAdmin)
+        ->test(Index::class)
+        ->call('startCreate')
+        ->set('title', 'Missing department')
+        ->set('body', 'Body text.')
+        ->call('save')
+        ->assertHasErrors(['department_id' => 'required']);
+});
+
+test('a super admin can create an announcement for any chosen department', function () {
+    $department = Department::factory()->create();
+    $superAdmin = createSuperAdmin();
+
+    Livewire::actingAs($superAdmin)
+        ->test(Index::class)
+        ->call('startCreate')
+        ->set('department_id', (string) $department->id)
+        ->set('title', 'Cross-department announcement')
+        ->set('body', 'Body text.')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $announcement = Announcement::query()->where('title', 'Cross-department announcement')->firstOrFail();
+    expect($announcement->department_id)->toBe($department->id);
+    expect($announcement->created_by)->toBe($superAdmin->id);
+});
+
 test('an admin officer cannot edit an announcement from another department', function () {
     $departmentA = Department::factory()->create();
     $departmentB = Department::factory()->create();

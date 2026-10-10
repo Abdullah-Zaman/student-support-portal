@@ -8,11 +8,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
 class ApplicationCategory extends Model
 {
     /** @use HasFactory<ApplicationCategoryFactory> */
-    use HasFactory, ScopedToAdminDepartment;
+    use HasFactory, LogsActivity, ScopedToAdminDepartment;
 
     protected $fillable = [
         'department_id',
@@ -26,6 +28,13 @@ class ApplicationCategory extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['department_id', 'name', 'is_active', 'sort_order'])
+            ->logOnlyDirty();
     }
 
     /**

@@ -1,3 +1,7 @@
+@php
+    $routePrefix = auth()->user()->hasRole(\App\Enums\RoleName::SuperAdmin->value) ? 'super-admin.' : 'admin.';
+@endphp
+
 <div class="flex flex-col gap-6 py-7">
     <x-page-header :title="$application->subject" :subtitle="$application->application_no">
         <x-slot:actions>
@@ -13,7 +17,7 @@
                     <div class="flex flex-col gap-1">
                         <dt class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Name') }}</dt>
                         <dd class="m-0 text-[15px] font-semibold">
-                            <flux:link :href="route('admin.students.show', $application->student)" wire:navigate>
+                            <flux:link :href="route($routePrefix.'students.show', $application->student)" wire:navigate>
                                 {{ $application->student->user->name }}
                             </flux:link>
                         </dd>
@@ -50,7 +54,7 @@
                     <ul class="m-0 flex flex-col">
                         @foreach ($this->previousApplications as $previous)
                             <li class="flex items-center justify-between gap-3 border-t border-border-soft px-[22px] py-3.5 first:border-t-0">
-                                <a href="{{ route('admin.applications.show', $previous) }}" wire:navigate class="flex flex-col gap-0.5 no-underline">
+                                <a href="{{ route($routePrefix.'applications.show', $previous) }}" wire:navigate class="flex flex-col gap-0.5 no-underline">
                                     <span class="font-semibold text-ink">{{ $previous->application_no }} &middot; {{ $previous->category->name }}</span>
                                     <span class="text-[13px] text-subtle">{{ $previous->created_at->format('j M Y') }}</span>
                                 </a>

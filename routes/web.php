@@ -6,6 +6,7 @@ use App\Http\Controllers\AnnouncementFileController;
 use App\Http\Controllers\ApplicationAttachmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
+use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Livewire\Admin\Announcements\Index as AdminAnnouncementsIndex;
 use App\Livewire\Admin\Applications\Index as AdminApplicationsIndex;
 use App\Livewire\Admin\Applications\Show as AdminApplicationsShow;
@@ -17,6 +18,10 @@ use App\Livewire\Student\Applications\Create as ApplicationsCreate;
 use App\Livewire\Student\Applications\Index as ApplicationsIndex;
 use App\Livewire\Student\Applications\Show as ApplicationsShow;
 use App\Livewire\Student\Profile as StudentProfile;
+use App\Livewire\SuperAdmin\AdminOfficers\Index as SuperAdminAdminOfficersIndex;
+use App\Livewire\SuperAdmin\AuditLog\Index as SuperAdminAuditLogIndex;
+use App\Livewire\SuperAdmin\Categories\Index as SuperAdminCategoriesIndex;
+use App\Livewire\SuperAdmin\Settings\Edit as SuperAdminSettingsEdit;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -67,7 +72,23 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value])
 Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
     ->prefix('super-admin')->name('super-admin.')
     ->group(function () {
-        Route::view('dashboard', 'super-admin.dashboard')->name('dashboard');
+        Route::get('dashboard', SuperAdminDashboardController::class)->name('dashboard');
+
+        Route::livewire('applications', AdminApplicationsIndex::class)->name('applications.index');
+        Route::livewire('applications/{application}', AdminApplicationsShow::class)->name('applications.show');
+
+        Route::livewire('admins', SuperAdminAdminOfficersIndex::class)->name('admins.index');
+
+        Route::livewire('students', AdminStudentsIndex::class)->name('students.index');
+        Route::livewire('students/{student}', AdminStudentsShow::class)->name('students.show');
+
+        Route::livewire('categories', SuperAdminCategoriesIndex::class)->name('categories.index');
+
+        Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
+        Route::livewire('announcements', AdminAnnouncementsIndex::class)->name('announcements.index');
+
+        Route::livewire('audit-log', SuperAdminAuditLogIndex::class)->name('audit-log.index');
+        Route::livewire('settings', SuperAdminSettingsEdit::class)->name('settings.edit');
     });
 
 require __DIR__.'/settings.php';

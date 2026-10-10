@@ -63,6 +63,26 @@ test('status filter narrows the results', function () {
         ->assertSee('Suspended Student');
 });
 
+test('a super admin sees students from every department and can filter to one', function () {
+    $departmentA = Department::factory()->create();
+    $departmentB = Department::factory()->create();
+    $superAdmin = createSuperAdmin();
+
+    $studentA = createStudentUser($departmentA);
+    $studentA->update(['name' => 'Ayesha Khan']);
+
+    $studentB = createStudentUser($departmentB);
+    $studentB->update(['name' => 'Bilal Yousaf']);
+
+    Livewire::actingAs($superAdmin)
+        ->test(Index::class)
+        ->assertSee('Ayesha Khan')
+        ->assertSee('Bilal Yousaf')
+        ->set('department_id', (string) $departmentA->id)
+        ->assertSee('Ayesha Khan')
+        ->assertDontSee('Bilal Yousaf');
+});
+
 test('clearFilters resets search and every dropdown', function () {
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
