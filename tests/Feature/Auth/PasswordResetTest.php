@@ -66,6 +66,18 @@ test('password can be reset with valid token', function () {
     });
 });
 
+test('password reset requests are rate limited to 5 attempts per minute per email and ip', function () {
+    $user = User::factory()->create();
+
+    for ($i = 0; $i < 5; $i++) {
+        $this->post(route('password.request'), ['email' => $user->email]);
+    }
+
+    $response = $this->post(route('password.request'), ['email' => $user->email]);
+
+    $response->assertStatus(429);
+});
+
 test('the forgot password form shows the same generic message whether the email is registered or not', function () {
     $user = User::factory()->create();
 

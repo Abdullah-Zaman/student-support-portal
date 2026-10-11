@@ -51,6 +51,7 @@ class FortifyServiceProvider extends ServiceProvider
         // one. Routes don't exist yet here, so wait until every provider
         // has booted.
         $this->app->booted($this->throttleRegistration(...));
+        $this->app->booted($this->throttlePasswordResetRequests(...));
     }
 
     /**
@@ -95,6 +96,12 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('registration', function (Request $request) {
             return Limit::perMinute(20)->by($request->ip());
         });
+
+        RateLimiter::for('password-reset', function (Request $request) {
+            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::email())).'|'.$request->ip());
+
+            return Limit::perMinute(5)->by($throttleKey);
+        });
     }
 
     /**
@@ -135,6 +142,21 @@ class FortifyServiceProvider extends ServiceProvider
         foreach (Route::getRoutes()->get() as $route) {
             if ($route->getName() === 'register.store') {
                 $route->middleware('throttle:registration');
+
+                return;
+            }
+        }
+    }
+
+    /**
+     * Fortify's password.email route (the "forgot password" request) ships
+     * with no throttle at all, same gap as registration above.
+     */
+    private function throttlePasswordResetRequests(): void
+    {
+        foreach (Route::getRoutes()->get() as $route) {
+            if ($route->getName() === 'password.email') {
+                $route->middleware('throttle:password-reset');
 
                 return;
             }

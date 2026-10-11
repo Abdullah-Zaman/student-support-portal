@@ -6,6 +6,7 @@ use App\Enums\RoleName;
 use App\Models\Application;
 use App\Models\ApplicationCategory;
 use App\Models\ApplicationEvent;
+use App\Models\ApplicationMessage;
 use App\Models\Student;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
@@ -108,6 +109,11 @@ class RefreshDemoData extends Command
 
                 ApplicationEvent::query()->where('application_id', $application->id)->delete();
                 DemoSeeder::createEvents($application, $appDef, $globalIndex, $student->user_id, $adminUserId);
+
+                ApplicationMessage::query()->where('application_id', $application->id)->delete();
+                if (! empty($appDef['messages'])) {
+                    DemoSeeder::createMessages($application, $appDef['messages'], $globalIndex, $student->user_id, $adminUserId);
+                }
 
                 $globalIndex++;
                 $applicationCount++;

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Spatie\Activitylog\Models\Activity;
@@ -40,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureMailSafety();
 
         Gate::policy(Activity::class, ActivityPolicy::class);
 
@@ -95,5 +97,19 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    /**
+     * Outside production, MAIL_ALWAYS_TO (if set) redirects every outgoing
+     * email to one inbox — so a non-production environment pointed at a
+     * real SMTP provider never emails an actual student or admin.
+     */
+    protected function configureMailSafety(): void
+    {
+        $alwaysTo = config('mail.always_to');
+
+        if (! app()->isProduction() && is_string($alwaysTo) && $alwaysTo !== '') {
+            Mail::alwaysTo($alwaysTo);
+        }
     }
 }

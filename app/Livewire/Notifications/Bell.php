@@ -26,8 +26,7 @@ class Bell extends Component
     }
 
     /**
-     * The student and Admin Officer each have their own notifications
-     * index route; Super Admin currently gets no notifications at all.
+     * Each role has its own notifications index route.
      */
     #[Computed]
     public function indexRouteName(): ?string
@@ -37,6 +36,7 @@ class Bell extends Component
         $name = match (true) {
             $user->hasRole(RoleName::Student->value) => 'student.notifications.index',
             $user->hasRole(RoleName::AdminOfficer->value) => 'admin.notifications.index',
+            $user->hasRole(RoleName::SuperAdmin->value) => 'super-admin.notifications.index',
             default => null,
         };
 

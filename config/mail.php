@@ -18,6 +18,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Always-To Override (non-production safety net)
+    |--------------------------------------------------------------------------
+    |
+    | When set, and the app is not running in production, every outgoing
+    | email is redirected to this address instead of its real recipient —
+    | see AppServiceProvider::boot(). Leave blank in production.
+    |
+    */
+
+    'always_to' => env('MAIL_ALWAYS_TO'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Mailer Configurations
     |--------------------------------------------------------------------------
     |

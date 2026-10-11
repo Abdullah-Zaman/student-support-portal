@@ -30,6 +30,18 @@ test('resending the verification email shows a confirmation message', function (
         ->assertSee('A new verification link has been sent.');
 });
 
+test('resending the verification email is rate limited to 6 attempts per minute', function () {
+    $user = User::factory()->unverified()->create();
+
+    for ($i = 0; $i < 6; $i++) {
+        $this->actingAs($user)->post(route('verification.send'));
+    }
+
+    $response = $this->actingAs($user)->post(route('verification.send'));
+
+    $response->assertStatus(429);
+});
+
 test('unverified users are redirected to the email verification prompt', function () {
     $user = User::factory()->unverified()->create();
 

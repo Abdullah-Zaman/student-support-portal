@@ -104,3 +104,20 @@ test('a super admin cannot access the admin officer applications or students ind
     $this->actingAs($superAdmin)->get(route('admin.applications.index'))->assertForbidden();
     $this->actingAs($superAdmin)->get(route('admin.students.index'))->assertForbidden();
 });
+
+test('an admin officer and a student cannot reach any super admin only route', function () {
+    $admin = createAdminOfficer();
+    $student = createStudentUser();
+
+    $superAdminOnlyRoutes = [
+        route('super-admin.admins.index'),
+        route('super-admin.categories.index'),
+        route('super-admin.audit-log.index'),
+        route('super-admin.settings.edit'),
+    ];
+
+    foreach ($superAdminOnlyRoutes as $url) {
+        $this->actingAs($admin)->get($url)->assertForbidden();
+        $this->actingAs($student)->get($url)->assertForbidden();
+    }
+});

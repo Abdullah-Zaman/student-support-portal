@@ -4,11 +4,14 @@ namespace Database\Seeders;
 
 use App\Enums\ApplicationEventType;
 use App\Enums\ApplicationStatus;
+use App\Enums\MessageType;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
+use App\Models\Announcement;
 use App\Models\Application;
 use App\Models\ApplicationCategory;
 use App\Models\ApplicationEvent;
+use App\Models\ApplicationMessage;
 use App\Models\Department;
 use App\Models\Student;
 use App\Models\User;
@@ -23,6 +26,10 @@ use Illuminate\Database\Seeder;
  *
  * To refresh an already-seeded database's demo rows in place (without
  * creating new ones or touching anything else), use `php artisan demo:refresh`.
+ *
+ * @phpstan-type MessageDef array{type: string, from: string, body: string}
+ * @phpstan-type AppDef array{category: string, status: string, priority: string, subject: string, body: string, resolution_note?: string, rejection_reason?: string, messages?: array<int, MessageDef>}
+ * @phpstan-type StudentDef array{name: string, program_code: string, batch: string, sequence: int, current_semester: int, applications: array<int, AppDef>}
  */
 class DemoSeeder extends Seeder
 {
@@ -85,16 +92,22 @@ class DemoSeeder extends Seeder
 
                 self::createEvents($application, $appDef, $globalIndex, $user->id, $adminUserId);
 
+                if (! empty($appDef['messages'])) {
+                    self::createMessages($application, $appDef['messages'], $globalIndex, $user->id, $adminUserId);
+                }
+
                 $globalIndex++;
             }
         }
+
+        self::createAnnouncements($department->id, $adminUserId);
     }
 
     /**
      * The realistic demo dataset, shared with `demo:refresh` so a fresh
      * seed and an in-place refresh always produce the same kind of data.
      *
-     * @return array<int, array{name: string, program_code: string, batch: string, sequence: int, current_semester: int, applications: array<int, array<string, string>>}>
+     * @return array<int, StudentDef>
      */
     public static function demoStudents(): array
     {
@@ -130,6 +143,16 @@ class DemoSeeder extends Seeder
                         'body' => 'The recorded lectures for Database Systems are not loading on the LMS portal. I get a blank page every time I try to open them.',
                         'rejection_reason' => 'This is a known, temporary LMS outage already reported to the vendor. No department-level action is needed; please retry after tonight\'s maintenance window ends.',
                     ],
+                    [
+                        'category' => 'Registration Issue',
+                        'status' => 'info_required',
+                        'priority' => 'normal',
+                        'subject' => 'Course withdrawal request missing approval',
+                        'body' => 'I submitted a course withdrawal request for Linear Algebra two weeks ago but it still shows as pending on the portal.',
+                        'messages' => [
+                            ['type' => 'info_request', 'from' => 'admin', 'body' => 'Please upload a copy of your signed withdrawal form so we can verify it against our records.'],
+                        ],
+                    ],
                 ],
             ],
             [
@@ -145,6 +168,9 @@ class DemoSeeder extends Seeder
                         'priority' => 'high',
                         'subject' => 'Exam result not updated on ERP for Calculus',
                         'body' => 'My result for the Calculus-II midterm exam has not appeared on the ERP even though the exam was conducted three weeks ago. My classmates have already received their marks.',
+                        'messages' => [
+                            ['type' => 'message', 'from' => 'admin', 'body' => 'We have escalated this to the Examination Department and are waiting for their confirmation. We will update you as soon as we hear back.'],
+                        ],
                     ],
                     [
                         'category' => 'Academic Issue',
@@ -183,6 +209,10 @@ class DemoSeeder extends Seeder
                         'priority' => 'high',
                         'subject' => 'Unable to submit assignment due to LMS error',
                         'body' => 'The LMS shows a server error whenever I try to upload my Data Structures assignment. The deadline is tomorrow and I am worried about a late submission penalty.',
+                        'messages' => [
+                            ['type' => 'info_request', 'from' => 'admin', 'body' => 'Could you share a screenshot of the error message you are seeing?'],
+                            ['type' => 'student_response', 'from' => 'student', 'body' => 'Attached is the screenshot showing the "500 Internal Server Error" message I get every time.'],
+                        ],
                     ],
                 ],
             ],
@@ -385,7 +415,7 @@ class DemoSeeder extends Seeder
      * concluded applications are treated as having been submitted a
      * semester earlier.
      *
-     * @param  array<string, string>  $appDef
+     * @param  AppDef  $appDef
      * @return array<string, mixed>
      */
     public static function applicationAttributes(array $appDef, int $globalIndex, int $currentSemester): array
@@ -416,7 +446,7 @@ class DemoSeeder extends Seeder
      * status: always a "submitted" event, plus — unless it's still
      * "submitted" — one more event for whichever status it concluded at.
      *
-     * @param  array<string, string>  $appDef
+     * @param  AppDef  $appDef
      */
     public static function createEvents(
         Application $application,
@@ -457,5 +487,89 @@ class DemoSeeder extends Seeder
             'visible_to_student' => true,
             'created_at' => $transitionAt,
         ])->save();
+    }
+
+    /**
+     * Creates a short message thread for an application: free-text
+     * messages, and info/document requests paired with the student
+     * response that answers them (matched in the order given).
+     *
+     * @param  array<int, MessageDef>  $messageDefs
+     */
+    public static function createMessages(
+        Application $application,
+        array $messageDefs,
+        int $globalIndex,
+        int $studentUserId,
+        ?int $adminUserId,
+    ): void {
+        [$submittedAt] = self::timestampsFor($globalIndex);
+        $when = $submittedAt->copy()->addDay();
+        $openRequestId = null;
+
+        foreach ($messageDefs as $def) {
+            $type = MessageType::from($def['type']);
+            $senderId = $def['from'] === 'admin' ? $adminUserId : $studentUserId;
+
+            $message = new ApplicationMessage;
+            $message->forceFill([
+                'application_id' => $application->id,
+                'sender_id' => $senderId,
+                'parent_id' => $type === MessageType::StudentResponse ? $openRequestId : null,
+                'type' => $type,
+                'body' => $def['body'],
+                'created_at' => $when,
+                'updated_at' => $when,
+            ])->save();
+
+            if (in_array($type, [MessageType::InfoRequest, MessageType::DocumentRequest], true)) {
+                $openRequestId = $message->id;
+            } elseif ($type === MessageType::StudentResponse && $openRequestId !== null) {
+                ApplicationMessage::query()->whereKey($openRequestId)->update(['responded_at' => $when]);
+                $openRequestId = null;
+            }
+
+            $when = $when->copy()->addHours(6);
+        }
+    }
+
+    /**
+     * A live, a scheduled and an expired announcement, so every status
+     * shown on the admin list and the student announcements page has at
+     * least one example. Idempotent by title, so re-running never
+     * duplicates them.
+     */
+    public static function createAnnouncements(int $departmentId, ?int $adminUserId): void
+    {
+        $announcements = [
+            [
+                'title' => 'Mid-Semester Examination Schedule Released',
+                'body' => "The mid-semester examination schedule for all programs has been published. Please check the Examination section of the portal for your exact dates and seating plan.\n\nContact the Examination Department if you notice any clash in your schedule.",
+                'publish_at' => now()->subDays(2),
+                'expires_at' => null,
+                'is_active' => true,
+            ],
+            [
+                'title' => 'Semester Fee Submission Deadline Reminder',
+                'body' => "This is a reminder that the semester fee submission deadline is approaching. Students who do not clear their dues by the deadline may be marked as defaulters.\n\nPlease contact the Accounts Office for any payment-related queries.",
+                'publish_at' => now()->addDays(5),
+                'expires_at' => null,
+                'is_active' => true,
+            ],
+            [
+                'title' => 'Summer Break Office Hours',
+                'body' => "During the summer break, the Software Engineering Department office will operate on reduced hours (10 AM to 2 PM, Monday to Friday).\n\nRegular hours will resume at the start of the next semester.",
+                'publish_at' => now()->subDays(20),
+                'expires_at' => now()->subDays(5),
+                'is_active' => true,
+            ],
+        ];
+
+        foreach ($announcements as $attributes) {
+            Announcement::query()->firstOrCreate(
+                ['department_id' => $departmentId, 'title' => $attributes['title']],
+                array_merge($attributes, ['created_by' => $adminUserId]),
+            );
+        }
     }
 }
