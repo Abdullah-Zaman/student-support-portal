@@ -62,6 +62,8 @@
             </section>
         @endif
 
+        <x-timetable-today-card :schedule="$schedule" />
+
         <section aria-label="{{ __('Summary') }}" class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
             <x-stat-tile :label="__('Total applications')" :value="$stats['total']" />
             <x-stat-tile :label="__('Waiting on you')" :value="$stats['waiting_on_you']" :note="__('Information requested')" />

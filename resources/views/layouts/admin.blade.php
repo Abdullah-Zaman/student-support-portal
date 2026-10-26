@@ -113,6 +113,16 @@
                 </flux:sidebar.item>
 
                 <flux:sidebar.item
+                    icon="calendar-days"
+                    :href="route($routePrefix.'timetable.index')"
+                    :current="request()->routeIs($routePrefix.'timetable.*')"
+                    wire:navigate
+                    :class="$navItemClass"
+                >
+                    {{ __('Timetable') }}
+                </flux:sidebar.item>
+
+                <flux:sidebar.item
                     icon="bell"
                     :href="Route::has($routePrefix.'notifications.index') ? route($routePrefix.'notifications.index') : '#'"
                     :current="request()->routeIs($routePrefix.'notifications.*')"

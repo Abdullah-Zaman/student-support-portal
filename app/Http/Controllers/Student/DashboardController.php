@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Announcement;
 use App\Models\Application;
 use App\Models\ApplicationEvent;
+use App\Support\Timetable\StudentSchedule;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -54,6 +55,7 @@ class DashboardController extends Controller
             ->get();
 
         return view('student.dashboard', [
+            'schedule' => StudentSchedule::for($student, Auth::user()->department_id),
             'applications' => $applications,
             'actionNeeded' => $actionNeeded,
             'latestEvents' => $latestEvents,

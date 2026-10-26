@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'Asia/Karachi',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Karachi'),
 
     /*
     |--------------------------------------------------------------------------

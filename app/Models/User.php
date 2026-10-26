@@ -144,4 +144,19 @@ class User extends Authenticatable implements MustVerifyEmail
             ->role(RoleName::AdminOfficer->value)
             ->get();
     }
+
+    /**
+     * Every active student in the given department — who to notify about
+     * department-wide news such as a new timetable.
+     *
+     * @return EloquentCollection<int, User>
+     */
+    public static function activeStudentsInDepartment(int $departmentId): EloquentCollection
+    {
+        return User::query()
+            ->where('department_id', $departmentId)
+            ->where('status', UserStatus::Active)
+            ->role(RoleName::Student->value)
+            ->get();
+    }
 }

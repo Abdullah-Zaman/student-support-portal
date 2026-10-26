@@ -7,17 +7,21 @@ use App\Http\Controllers\ApplicationAttachmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
+use App\Http\Controllers\TimetableFileController;
 use App\Livewire\Admin\Announcements\Index as AdminAnnouncementsIndex;
 use App\Livewire\Admin\Applications\Index as AdminApplicationsIndex;
 use App\Livewire\Admin\Applications\Show as AdminApplicationsShow;
 use App\Livewire\Admin\Students\Index as AdminStudentsIndex;
 use App\Livewire\Admin\Students\Show as AdminStudentsShow;
+use App\Livewire\Admin\Timetables\Index as AdminTimetablesIndex;
+use App\Livewire\Admin\Timetables\Show as AdminTimetablesShow;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Student\Announcements\Index as StudentAnnouncementsIndex;
 use App\Livewire\Student\Applications\Create as ApplicationsCreate;
 use App\Livewire\Student\Applications\Index as ApplicationsIndex;
 use App\Livewire\Student\Applications\Show as ApplicationsShow;
 use App\Livewire\Student\Profile as StudentProfile;
+use App\Livewire\Student\Timetable as StudentTimetable;
 use App\Livewire\SuperAdmin\AdminOfficers\Index as SuperAdminAdminOfficersIndex;
 use App\Livewire\SuperAdmin\AuditLog\Index as SuperAdminAuditLogIndex;
 use App\Livewire\SuperAdmin\Categories\Index as SuperAdminCategoriesIndex;
@@ -41,6 +45,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('announcements.image.show');
     Route::get('announcements/{announcement}/attachment', [AnnouncementFileController::class, 'attachment'])
         ->name('announcements.attachment.show');
+
+    Route::get('timetable/versions/{version}/download', [TimetableFileController::class, 'download'])
+        ->name('timetable.download');
 });
 
 Route::middleware(['auth', 'verified', 'role:'.RoleName::Student->value])
@@ -55,6 +62,7 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::Student->value])
 
         Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
         Route::livewire('announcements', StudentAnnouncementsIndex::class)->name('announcements.index');
+        Route::livewire('timetable', StudentTimetable::class)->name('timetable');
     });
 
 Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value])
@@ -70,6 +78,9 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value])
 
         Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
         Route::livewire('announcements', AdminAnnouncementsIndex::class)->name('announcements.index');
+
+        Route::livewire('timetable', AdminTimetablesIndex::class)->name('timetable.index');
+        Route::livewire('timetable/{version}', AdminTimetablesShow::class)->name('timetable.show');
     });
 
 Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
@@ -93,6 +104,9 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
 
         Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
         Route::livewire('announcements', AdminAnnouncementsIndex::class)->name('announcements.index');
+
+        Route::livewire('timetable', AdminTimetablesIndex::class)->name('timetable.index');
+        Route::livewire('timetable/{version}', AdminTimetablesShow::class)->name('timetable.show');
 
         Route::livewire('audit-log', SuperAdminAuditLogIndex::class)->name('audit-log.index');
         Route::livewire('settings', SuperAdminSettingsEdit::class)->name('settings.edit');

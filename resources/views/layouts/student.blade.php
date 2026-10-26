@@ -37,6 +37,17 @@
                     {{ __('My applications') }}
                 </a>
                 <a
+                    href="{{ route('student.timetable') }}"
+                    wire:navigate
+                    @class([
+                        'rounded-lg px-3.5 py-2.5 text-sm no-underline',
+                        'bg-white/16 font-semibold text-white' => request()->routeIs('student.timetable'),
+                        'font-medium text-white/88 hover:text-white' => ! request()->routeIs('student.timetable'),
+                    ])
+                >
+                    {{ __('Timetable') }}
+                </a>
+                <a
                     href="{{ Route::has('student.announcements.index') ? route('student.announcements.index') : '#' }}"
                     wire:navigate
                     @class([
@@ -115,6 +126,9 @@
                     wire:navigate
                 >
                     {{ __('My applications') }}
+                </flux:sidebar.item>
+                <flux:sidebar.item icon="calendar-days" :href="route('student.timetable')" :current="request()->routeIs('student.timetable')" wire:navigate>
+                    {{ __('Timetable') }}
                 </flux:sidebar.item>
                 <flux:sidebar.item
                     icon="megaphone"

@@ -13,6 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property int $current_semester
+ * @property string|null $section
+ */
 class Student extends Model
 {
     /** @use HasFactory<StudentFactory> */
@@ -24,12 +28,13 @@ class Student extends Model
         'program_id',
         'current_semester',
         'batch',
+        'section',
     ];
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['program_id', 'current_semester', 'batch'])
+            ->logOnly(['program_id', 'current_semester', 'batch', 'section'])
             ->logOnlyDirty();
     }
 

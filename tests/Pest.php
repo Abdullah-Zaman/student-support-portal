@@ -12,6 +12,8 @@ use Database\Seeders\FacultySeeder;
 use Database\Seeders\ProgramSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -138,4 +140,58 @@ function createApplicationInDepartment(Department $department, User $student): A
         'department_id' => $department->id,
         'category_id' => $category->id,
     ]);
+}
+
+/**
+ * A small timetable workbook written to a temp file, shaped like the real
+ * department file: a weekday sheet with a merged two-slot class, a floor
+ * merged down over two rooms, a time override, a whole-semester
+ * "Combined" class and an unreadable cell; and a weekend sheet with the
+ * sections on the same line as the course. Returns the file path.
+ */
+function makeTimetableWorkbook(): string
+{
+    $spreadsheet = new Spreadsheet;
+
+    $weekdays = $spreadsheet->getActiveSheet()->setTitle('Time Table');
+    $weekdays->fromArray([
+        ['Department of Software Engineering {Monday to Friday Timetable}'],
+        [],
+        ['Monday ', 'Rooms', null, '8:00-9:20', '9:20-10:40', '10:45-12:05', '01:30 - 02:50'],
+        [null, 'Lecture Room # 22', 'Ist Floor ', "Software Engineering \nBSSE-3A & BSSE-3B\nMr. Muhammad Hamza ", null, "Operating Systems (Lab)\nBSSE-5A\nMr. Muhammad Abdullah", "Pre Calculus \nBSSE-1\nCombined\nMr. Zahid Ali\n(01:30 - 03:30)"],
+        [null, 'Computer Lab-7', null, "Applied Physics (Thoery + Lab)\nBSSE-1A\nMr. Zahid Ali", "Database Systems \nBSSE-1B\nMs. Laiba Tahir", 'Lab closed for maintenance'],
+    ]);
+    $weekdays->mergeCells('A3:A5');
+    $weekdays->mergeCells('C4:C5');
+    $weekdays->mergeCells('D4:E4');
+
+    $weekend = $spreadsheet->createSheet()->setTitle('1M Timetable ');
+    $weekend->fromArray([
+        ['Saturday'],
+        ['Saturday', 'Rooms', '09:00 - 11:40', '11:40 - 02:20'],
+        [null, 'Lecture Room # 23', "Data Visualization BSAI-7C / BSAI-8A/BSDS-8A\nMr. Usmar"],
+    ]);
+
+    $path = tempnam(sys_get_temp_dir(), 'timetable').'.xlsx';
+    (new Xlsx($spreadsheet))->save($path);
+
+    return $path;
+}
+
+/**
+ * A student user in the given department whose program has the given
+ * code (e.g. "BSSE"), in the given semester and timetable section.
+ */
+function createTimetableStudent(Department $department, string $programCode, int $semester, ?string $section = null): User
+{
+    $user = createStudentUser($department);
+
+    $program = Program::withoutGlobalScopes()->firstOrCreate(
+        ['code' => $programCode],
+        ['department_id' => $department->id, 'name' => "BS {$programCode}"],
+    );
+
+    $user->student->update(['program_id' => $program->id, 'current_semester' => $semester, 'section' => $section]);
+
+    return $user->refresh();
 }

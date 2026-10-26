@@ -78,6 +78,10 @@
     textarea::placeholder {
         color: var(--color-placeholder);
     }
+
+    [x-cloak] {
+        display: none !important;
+    }
 }
 
 [data-flux-field]:not(ui-radio, ui-checkbox) {
