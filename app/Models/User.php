@@ -24,6 +24,7 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * @property int $id
  * @property int|null $department_id
+ * @property int|null $faculty_id
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at
@@ -34,7 +35,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'department_id', 'status', 'email_verified_at'])]
+#[Fillable(['name', 'email', 'password', 'department_id', 'faculty_id', 'status', 'email_verified_at'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -59,7 +60,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'email', 'status', 'department_id'])
+            ->logOnly(['name', 'email', 'status', 'department_id', 'faculty_id'])
             ->logOnlyDirty();
     }
 
@@ -69,6 +70,36 @@ class User extends Authenticatable implements MustVerifyEmail
     public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * A Dean's faculty. Other users have none.
+     *
+     * @return BelongsTo<Faculty, $this>
+     */
+    public function faculty(): BelongsTo
+    {
+        return $this->belongsTo(Faculty::class);
+    }
+
+    /**
+     * The user's staff role that matters for forwarding and for which
+     * portal they use. Null for students.
+     */
+    public function staffRole(): ?RoleName
+    {
+        foreach ([RoleName::SuperAdmin, RoleName::AdminOfficer, RoleName::Hod, RoleName::Dean] as $role) {
+            if ($this->hasRole($role->value)) {
+                return $role;
+            }
+        }
+
+        return null;
+    }
+
+    public function isReviewer(): bool
+    {
+        return $this->hasAnyRole([RoleName::Hod->value, RoleName::Dean->value]);
     }
 
     /**
@@ -143,6 +174,34 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('department_id', $departmentId)
             ->role(RoleName::AdminOfficer->value)
             ->get();
+    }
+
+    /**
+     * The one active HOD of a department, who receives its forwards.
+     */
+    public static function activeHodForDepartment(int $departmentId): ?self
+    {
+        return User::query()
+            ->where('department_id', $departmentId)
+            ->where('status', UserStatus::Active)
+            ->role(RoleName::Hod->value)
+            ->first();
+    }
+
+    /**
+     * The one active Dean of a faculty, who receives its forwards.
+     */
+    public static function activeDeanForFaculty(?int $facultyId): ?self
+    {
+        if ($facultyId === null) {
+            return null;
+        }
+
+        return User::query()
+            ->where('faculty_id', $facultyId)
+            ->where('status', UserStatus::Active)
+            ->role(RoleName::Dean->value)
+            ->first();
     }
 
     /**

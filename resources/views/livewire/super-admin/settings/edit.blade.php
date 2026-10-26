@@ -9,4 +9,12 @@
             <flux:button variant="primary" class="self-end" wire:click="save">{{ __('Save') }}</flux:button>
         </div>
     </x-panel>
+
+    <x-panel :title="__('Forwarding')">
+        <div class="flex flex-col gap-4 px-[22px] py-5">
+            <flux:input type="email" wire:model="registrar_email" :label="__('Registrar email')" :description="__('HODs and Deans forward applications to this address. Leave blank to turn off forwarding to the Registrar.')" />
+
+            <flux:button variant="primary" class="self-end" wire:click="save">{{ __('Save') }}</flux:button>
+        </div>
+    </x-panel>
 </div>

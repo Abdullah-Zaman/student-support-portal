@@ -1,9 +1,15 @@
 @props(['title' => null])
 
 @php
-    $isSuperAdmin = auth()->user()?->hasRole(\App\Enums\RoleName::SuperAdmin->value);
-    $dashboardRoute = $isSuperAdmin ? 'super-admin.dashboard' : 'admin.dashboard';
-    $routePrefix = $isSuperAdmin ? 'super-admin.' : 'admin.';
+    $staffRole = auth()->user()?->staffRole();
+    $isSuperAdmin = $staffRole === \App\Enums\RoleName::SuperAdmin;
+    $isReviewer = (bool) $staffRole?->isReviewer();
+    $routePrefix = match (true) {
+        $isSuperAdmin => 'super-admin.',
+        $isReviewer => $staffRole->value.'.',
+        default => 'admin.',
+    };
+    $dashboardRoute = $routePrefix.'dashboard';
     $navItemClass = 'text-white/85! data-current:border-transparent! data-current:bg-white/14! data-current:text-white! hover:text-white! hover:bg-white/8!';
 @endphp
 
@@ -35,9 +41,10 @@
                     wire:navigate
                     :class="$navItemClass"
                 >
-                    {{ __('Applications') }}
+                    {{ $isReviewer ? __('Forwarded to me') : __('Applications') }}
                 </flux:sidebar.item>
 
+                @unless ($isReviewer)
                 @if ($isSuperAdmin)
                     <flux:sidebar.item
                         icon="user-group"
@@ -47,6 +54,16 @@
                         :class="$navItemClass"
                     >
                         {{ __('Admin Officers') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="identification"
+                        :href="route('super-admin.reviewers.index')"
+                        :current="request()->routeIs('super-admin.reviewers.*')"
+                        wire:navigate
+                        :class="$navItemClass"
+                    >
+                        {{ __('HODs & Deans') }}
                     </flux:sidebar.item>
                 @endif
 
@@ -122,6 +139,8 @@
                     {{ __('Timetable') }}
                 </flux:sidebar.item>
 
+                @endunless
+
                 <flux:sidebar.item
                     icon="bell"
                     :href="Route::has($routePrefix.'notifications.index') ? route($routePrefix.'notifications.index') : '#'"
@@ -162,7 +181,15 @@
                     <flux:avatar size="sm" :name="auth()->user()->name" :initials="auth()->user()->initials()" />
                     <span class="flex flex-1 flex-col leading-tight">
                         <span class="text-sm font-semibold">{{ auth()->user()->name }}</span>
-                        <span class="text-xs text-white/72">{{ $isSuperAdmin ? __('Super Admin') : __('Admin Officer').' · '.(auth()->user()->department?->code ?? '') }}</span>
+                        <span class="text-xs text-white/72">
+                            @if ($isSuperAdmin)
+                                {{ __('Super Admin') }}
+                            @elseif ($staffRole === \App\Enums\RoleName::Dean)
+                                {{ __('Dean').' · '.(auth()->user()->faculty?->code ?? '') }}
+                            @else
+                                {{ __($staffRole?->label() ?? 'Admin Officer').' · '.(auth()->user()->department?->code ?? '') }}
+                            @endif
+                        </span>
                     </span>
                     <flux:icon icon="ellipsis-vertical" variant="mini" class="size-4.5 text-white/80" />
                 </button>
@@ -185,6 +212,7 @@
         <flux:header class="border-b border-border bg-white">
             <flux:sidebar.toggle class="text-ink lg:hidden" icon="bars-2" />
 
+            @unless ($isReviewer)
             <form
                 action="{{ Route::has($routePrefix.'applications.index') ? route($routePrefix.'applications.index') : '#' }}"
                 method="GET"
@@ -200,6 +228,7 @@
                     class="min-w-0 flex-1 border-0 bg-transparent font-sans text-sm text-ink outline-none placeholder:text-placeholder"
                 />
             </form>
+            @endunless
 
             <flux:spacer />
 

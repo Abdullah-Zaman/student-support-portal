@@ -16,6 +16,9 @@ use App\Livewire\Admin\Students\Show as AdminStudentsShow;
 use App\Livewire\Admin\Timetables\Index as AdminTimetablesIndex;
 use App\Livewire\Admin\Timetables\Show as AdminTimetablesShow;
 use App\Livewire\Notifications\Index as NotificationsIndex;
+use App\Livewire\Reviewer\Applications\Index as ReviewerApplicationsIndex;
+use App\Livewire\Reviewer\Applications\Show as ReviewerApplicationsShow;
+use App\Livewire\Reviewer\Dashboard as ReviewerDashboard;
 use App\Livewire\Student\Announcements\Index as StudentAnnouncementsIndex;
 use App\Livewire\Student\Applications\Create as ApplicationsCreate;
 use App\Livewire\Student\Applications\Index as ApplicationsIndex;
@@ -28,6 +31,7 @@ use App\Livewire\SuperAdmin\Categories\Index as SuperAdminCategoriesIndex;
 use App\Livewire\SuperAdmin\Departments\Index as SuperAdminDepartmentsIndex;
 use App\Livewire\SuperAdmin\Faculties\Index as SuperAdminFacultiesIndex;
 use App\Livewire\SuperAdmin\Programs\Index as SuperAdminProgramsIndex;
+use App\Livewire\SuperAdmin\Reviewers\Index as SuperAdminReviewersIndex;
 use App\Livewire\SuperAdmin\Settings\Edit as SuperAdminSettingsEdit;
 use Illuminate\Support\Facades\Route;
 
@@ -92,6 +96,7 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
         Route::livewire('applications/{application}', AdminApplicationsShow::class)->name('applications.show');
 
         Route::livewire('admins', SuperAdminAdminOfficersIndex::class)->name('admins.index');
+        Route::livewire('reviewers', SuperAdminReviewersIndex::class)->name('reviewers.index');
 
         Route::livewire('students', AdminStudentsIndex::class)->name('students.index');
         Route::livewire('students/{student}', AdminStudentsShow::class)->name('students.show');
@@ -111,5 +116,21 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
         Route::livewire('audit-log', SuperAdminAuditLogIndex::class)->name('audit-log.index');
         Route::livewire('settings', SuperAdminSettingsEdit::class)->name('settings.edit');
     });
+
+/*
+ * HOD and Dean share one read-only portal under their own prefix. Which
+ * applications they see is enforced by Application::forwardedTo and the
+ * ApplicationPolicy, not by the route.
+ */
+foreach ([RoleName::Hod, RoleName::Dean] as $reviewerRole) {
+    Route::middleware(['auth', 'verified', 'role:'.$reviewerRole->value])
+        ->prefix($reviewerRole->value)->name($reviewerRole->value.'.')
+        ->group(function () {
+            Route::livewire('dashboard', ReviewerDashboard::class)->name('dashboard');
+            Route::livewire('applications', ReviewerApplicationsIndex::class)->name('applications.index');
+            Route::livewire('applications/{application}', ReviewerApplicationsShow::class)->name('applications.show');
+            Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
+        });
+}
 
 require __DIR__.'/settings.php';

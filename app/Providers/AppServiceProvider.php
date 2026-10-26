@@ -8,6 +8,8 @@ use App\Listeners\RecordFailedLogin;
 use App\Listeners\RecordSuccessfulLogin;
 use App\Policies\ActivityPolicy;
 use App\Support\BrandedMailMessage;
+use App\Support\Forwarding\ForwardMailer;
+use App\Support\Forwarding\LogForwardMailer;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
@@ -32,7 +34,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(ForwardMailer::class, LogForwardMailer::class);
     }
 
     /**

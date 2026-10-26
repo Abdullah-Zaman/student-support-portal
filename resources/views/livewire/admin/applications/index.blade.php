@@ -49,6 +49,16 @@
                 </flux:select>
             </div>
 
+            <div class="flex min-w-0 flex-1 basis-40 flex-col gap-1">
+                <flux:select wire:model.live="forwarded" :label="__('Forwarded')">
+                    <flux:select.option value="">{{ __('All applications') }}</flux:select.option>
+                    <flux:select.option value="any">{{ __('Any forward') }}</flux:select.option>
+                    @foreach (\App\Enums\ForwardTarget::cases() as $target)
+                        <flux:select.option :value="$target->value">{{ __($target->badgeLabel()) }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </div>
+
             <div class="flex min-w-0 flex-1 basis-28 flex-col gap-1">
                 <flux:select wire:model.live="semester" :label="__('Semester')">
                     <flux:select.option value="">{{ __('All') }}</flux:select.option>
@@ -128,7 +138,12 @@
                                 </td>
                                 <td class="px-3 py-3.5 tabular-nums text-ink-soft">{{ $application->semester_at_submission }}</td>
                                 <td class="px-3 py-3.5"><x-priority-badge :priority="$application->priority" /></td>
-                                <td class="px-3 py-3.5"><x-status-badge :status="$application->status" /></td>
+                                <td class="px-3 py-3.5">
+                                    <div class="flex flex-col items-start gap-1">
+                                        <x-status-badge :status="$application->status" />
+                                        <x-forwarded-badge :target="$application->forwarded_to" />
+                                    </div>
+                                </td>
                                 <td class="px-3 py-3.5 whitespace-nowrap text-ink-soft">{{ $application->created_at->format('j M, g:i A') }}</td>
                                 <td class="px-[22px] py-3.5 text-right">
                                     <flux:button :href="route($routePrefix.'applications.show', $application)" variant="ghost" size="sm" wire:navigate>{{ __('Open') }}</flux:button>

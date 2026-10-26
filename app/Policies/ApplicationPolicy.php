@@ -2,7 +2,7 @@
 
 namespace App\Policies;
 
-use App\Enums\ApplicationStatus;
+use App\Enums\ForwardTarget;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Models\Application;
@@ -12,8 +12,8 @@ class ApplicationPolicy
 {
     /**
      * Listing is always allowed; which rows come back is enforced by
-     * query scoping (ScopedToAdminDepartment / the student's own relation),
-     * not by this policy.
+     * query scoping (ScopedToAdminDepartment, the student's own relation,
+     * or Application::forwardedTo for an HOD/Dean), not by this policy.
      */
     public function viewAny(User $user): bool
     {
@@ -21,12 +21,62 @@ class ApplicationPolicy
             RoleName::Student->value,
             RoleName::AdminOfficer->value,
             RoleName::SuperAdmin->value,
+            RoleName::Hod->value,
+            RoleName::Dean->value,
         ]);
     }
 
+    /**
+     * An HOD or Dean may only open applications forwarded to them.
+     */
     public function view(User $user, Application $application): bool
     {
+        if ($user->isReviewer()) {
+            return $application->isForwardedTo($user);
+        }
+
         return $this->ownsOrManages($user, $application);
+    }
+
+    /**
+     * Allowed paths: Admin Officer (or Super Admin) → HOD or Dean; HOD →
+     * Dean or Registrar; Dean → Registrar. An HOD or Dean may only pass
+     * on an application forwarded to them, and nothing final is forwarded.
+     */
+    public function forward(User $user, Application $application, ForwardTarget $target): bool
+    {
+        $role = $user->staffRole();
+
+        if ($role === null || $application->isFinal() || ! in_array($target, ForwardTarget::allowedFrom($role), true)) {
+            return false;
+        }
+
+        return $role->isReviewer()
+            ? $application->isForwardedTo($user)
+            : $this->manages($user, $application);
+    }
+
+    /**
+     * Recommended / Not recommended / Comment, by the HOD or Dean the
+     * application was forwarded to.
+     */
+    public function remark(User $user, Application $application): bool
+    {
+        return $user->isReviewer()
+            && ! $application->isFinal()
+            && $application->isForwardedTo($user);
+    }
+
+    /**
+     * The forward notes and remarks are for staff only, never students.
+     */
+    public function viewForwardChain(User $user, Application $application): bool
+    {
+        if ($user->isReviewer()) {
+            return $application->isForwardedTo($user);
+        }
+
+        return $this->manages($user, $application);
     }
 
     public function create(User $user): bool
@@ -113,6 +163,6 @@ class ApplicationPolicy
 
     private function isFinal(Application $application): bool
     {
-        return in_array($application->status, [ApplicationStatus::Closed, ApplicationStatus::Rejected], true);
+        return $application->isFinal();
     }
 }

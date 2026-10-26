@@ -15,4 +15,5 @@ enum ApplicationEventType: string
     case Resolved = 'resolved';
     case Closed = 'closed';
     case Rejected = 'rejected';
+    case Forwarded = 'forwarded';
 }

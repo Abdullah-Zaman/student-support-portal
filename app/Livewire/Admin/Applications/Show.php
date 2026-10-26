@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Applications;
 
+use App\Concerns\ForwardsApplications;
 use App\Enums\ApplicationEventType;
 use App\Enums\ApplicationPriority;
 use App\Enums\ApplicationStatus;
@@ -30,6 +31,8 @@ use Livewire\Component;
 #[Title('Application Details')]
 class Show extends Component
 {
+    use ForwardsApplications;
+
     /**
      * Status values selectable from the generic "change status" action.
      * Resolve/reject/close are their own dedicated actions because they
@@ -132,6 +135,11 @@ class Show extends Component
     public function hasOpenRequest(): bool
     {
         return $this->openRequestQuery()->exists();
+    }
+
+    protected function afterForwarding(): void
+    {
+        unset($this->timeline);
     }
 
     public function messageMaxLength(): int

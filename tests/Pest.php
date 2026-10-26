@@ -1,9 +1,13 @@
 <?php
 
+use App\Enums\ForwardEmailStatus;
+use App\Enums\ForwardTarget;
 use App\Enums\RoleName;
 use App\Models\Application;
 use App\Models\ApplicationCategory;
+use App\Models\ApplicationForward;
 use App\Models\Department;
+use App\Models\Faculty;
 use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
@@ -194,4 +198,49 @@ function createTimetableStudent(Department $department, string $programCode, int
     $user->student->update(['program_id' => $program->id, 'current_semester' => $semester, 'section' => $section]);
 
     return $user->refresh();
+}
+
+/**
+ * An active HOD of the given (or a fresh) department.
+ */
+function createHod(?Department $department = null): User
+{
+    $department ??= Department::factory()->create();
+
+    $user = User::factory()->create(['department_id' => $department->id]);
+    $user->assignRole(RoleName::Hod->value);
+
+    return $user;
+}
+
+/**
+ * An active Dean of the given (or a fresh) faculty.
+ */
+function createDean(?Faculty $faculty = null): User
+{
+    $faculty ??= Faculty::factory()->create();
+
+    $user = User::factory()->create(['department_id' => null, 'faculty_id' => $faculty->id]);
+    $user->assignRole(RoleName::Dean->value);
+
+    return $user;
+}
+
+/**
+ * Record a forward directly (no notifications), for arranging a test.
+ */
+function recordForward(Application $application, ForwardTarget $target, User $from, string $note = 'Please review.'): ApplicationForward
+{
+    $forward = ApplicationForward::create([
+        'application_id' => $application->id,
+        'from_user_id' => $from->id,
+        'from_role' => $from->staffRole(),
+        'to_role' => $target,
+        'note' => $note,
+        'email_status' => $target === ForwardTarget::Registrar ? ForwardEmailStatus::PendingEmail : ForwardEmailStatus::NotRequired,
+    ]);
+
+    $application->update(['forwarded_to' => $target]);
+
+    return $forward;
 }

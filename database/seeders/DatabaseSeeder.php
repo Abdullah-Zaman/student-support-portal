@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             ApplicationCategorySeeder::class,
             SettingSeeder::class,
             AdminUserSeeder::class,
+            ReviewerUserSeeder::class,
         ]);
     }
 }

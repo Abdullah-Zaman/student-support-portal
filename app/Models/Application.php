@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\ApplicationPriority;
 use App\Enums\ApplicationStatus;
+use App\Enums\ForwardTarget;
 use App\Enums\MessageType;
+use App\Enums\RoleName;
 use App\Models\Concerns\ScopedToAdminDepartment;
 use Database\Factories\ApplicationFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +21,8 @@ use Spatie\Activitylog\Support\LogOptions;
 /**
  * @property ApplicationStatus $status
  * @property ApplicationPriority $priority
+ * @property ForwardTarget|null $forwarded_to
+ * @property int $department_id
  */
 class Application extends Model
 {
@@ -35,6 +39,7 @@ class Application extends Model
         'semester_at_submission',
         'priority',
         'status',
+        'forwarded_to',
         'resolution_note',
         'rejection_reason',
         'resolved_at',
@@ -46,6 +51,7 @@ class Application extends Model
         return [
             'priority' => ApplicationPriority::class,
             'status' => ApplicationStatus::class,
+            'forwarded_to' => ForwardTarget::class,
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
         ];
@@ -129,6 +135,64 @@ class Application extends Model
     public function internalNotes(): HasMany
     {
         return $this->hasMany(InternalNote::class);
+    }
+
+    /**
+     * Staff-only forwarding chain. Never load this in a student view.
+     *
+     * @return HasMany<ApplicationForward, $this>
+     */
+    public function forwards(): HasMany
+    {
+        return $this->hasMany(ApplicationForward::class);
+    }
+
+    /**
+     * Staff-only HOD/Dean remarks. Never load this in a student view.
+     *
+     * @return HasMany<ApplicationRemark, $this>
+     */
+    public function remarks(): HasMany
+    {
+        return $this->hasMany(ApplicationRemark::class);
+    }
+
+    /**
+     * Closed and rejected applications are final: no more messages,
+     * forwards or remarks.
+     */
+    public function isFinal(): bool
+    {
+        return in_array($this->status, [ApplicationStatus::Closed, ApplicationStatus::Rejected], true);
+    }
+
+    /**
+     * Applications forwarded to the given HOD or Dean: an HOD sees those
+     * forwarded to the HOD of their own department, a Dean those
+     * forwarded to the Dean from a department of their own faculty. Any
+     * other user gets no rows.
+     *
+     * @param  Builder<Application>  $query
+     * @return Builder<Application>
+     */
+    public function scopeForwardedTo(Builder $query, User $reviewer): Builder
+    {
+        if ($reviewer->hasRole(RoleName::Hod->value) && $reviewer->department_id !== null) {
+            return $query->where($query->qualifyColumn('department_id'), $reviewer->department_id)
+                ->whereHas('forwards', fn (Builder $query) => $query->where('to_role', ForwardTarget::Hod));
+        }
+
+        if ($reviewer->hasRole(RoleName::Dean->value) && $reviewer->faculty_id !== null) {
+            return $query->whereHas('department', fn (Builder $query) => $query->where('faculty_id', $reviewer->faculty_id))
+                ->whereHas('forwards', fn (Builder $query) => $query->where('to_role', ForwardTarget::Dean));
+        }
+
+        return $query->whereRaw('1 = 0');
+    }
+
+    public function isForwardedTo(User $reviewer): bool
+    {
+        return self::query()->whereKey($this->getKey())->forwardedTo($reviewer)->exists();
     }
 
     /**

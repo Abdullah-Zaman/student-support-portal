@@ -30,7 +30,8 @@ class ApplicationAttachmentPolicy
      */
     public function create(User $user, Application $application): bool
     {
-        return $this->belongsToApplication($user, $application);
+        // HOD and Dean only read attachments; they never upload.
+        return ! $user->isReviewer() && $this->belongsToApplication($user, $application);
     }
 
     private function belongsToApplication(User $user, Application $application): bool
@@ -45,6 +46,10 @@ class ApplicationAttachmentPolicy
 
         if ($user->hasRole(RoleName::Student->value)) {
             return $user->student?->id === $application->student_id;
+        }
+
+        if ($user->isReviewer()) {
+            return $application->isForwardedTo($user);
         }
 
         return false;

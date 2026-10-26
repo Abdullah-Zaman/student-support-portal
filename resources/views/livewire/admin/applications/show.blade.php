@@ -7,6 +7,7 @@
         <x-slot:actions>
             <x-priority-badge :priority="$application->priority" />
             <x-status-badge :status="$application->status" />
+            <x-forwarded-badge :target="$application->forwarded_to" class="py-1! text-[13px]!" />
         </x-slot:actions>
     </x-page-header>
 
@@ -113,6 +114,10 @@
                     </ul>
                 </x-panel>
             @endif
+
+            <x-panel :title="__('Forwards & remarks')">
+                <x-forward-chain :forwards="$this->forwards" />
+            </x-panel>
 
             <x-panel :title="__('Messages')">
                 @if ($this->isFinal)
@@ -238,6 +243,12 @@
         </div>
 
         <aside class="flex min-w-0 flex-1 basis-80 flex-col gap-6">
+            @if (! $this->isFinal && $this->forwardOptions !== [])
+                <x-panel :title="__('Forward')">
+                    <x-forward-form :options="$this->forwardOptions" />
+                </x-panel>
+            @endif
+
             @if ($this->isFinal)
                 <x-panel :title="__('Actions')">
                     <div class="px-[22px] py-5 text-sm text-subtle">

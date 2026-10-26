@@ -37,6 +37,8 @@ class Bell extends Component
             $user->hasRole(RoleName::Student->value) => 'student.notifications.index',
             $user->hasRole(RoleName::AdminOfficer->value) => 'admin.notifications.index',
             $user->hasRole(RoleName::SuperAdmin->value) => 'super-admin.notifications.index',
+            $user->hasRole(RoleName::Hod->value) => 'hod.notifications.index',
+            $user->hasRole(RoleName::Dean->value) => 'dean.notifications.index',
             default => null,
         };
 

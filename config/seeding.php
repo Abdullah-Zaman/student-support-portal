@@ -25,4 +25,14 @@ return [
         'password' => env('SEED_ADMIN_OFFICER_PASSWORD', 'Password123!'),
     ],
 
+    'hod' => [
+        'email' => env('SEED_HOD_EMAIL', 'hod.se@superior.edu.pk'),
+        'password' => env('SEED_HOD_PASSWORD', 'Password123!'),
+    ],
+
+    'dean' => [
+        'email' => env('SEED_DEAN_EMAIL', 'dean@superior.edu.pk'),
+        'password' => env('SEED_DEAN_PASSWORD', 'Password123!'),
+    ],
+
 ];

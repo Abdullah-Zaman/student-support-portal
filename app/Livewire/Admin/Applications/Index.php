@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Applications;
 use App\Concerns\FiltersByStudentProfile;
 use App\Enums\ApplicationPriority;
 use App\Enums\ApplicationStatus;
+use App\Enums\ForwardTarget;
 use App\Enums\RoleName;
 use App\Models\Application;
 use App\Models\ApplicationCategory;
@@ -50,6 +51,13 @@ class Index extends Component
     #[Url]
     public string $department_id = '';
 
+    /**
+     * '' (all), 'any' (forwarded anywhere), or a ForwardTarget value:
+     * where the application was last forwarded.
+     */
+    #[Url]
+    public string $forwarded = '';
+
     #[Url]
     public string $sort = 'created_at';
 
@@ -63,7 +71,7 @@ class Index extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id', ...$this->studentProfileFilterProperties()], true)) {
+        if (in_array($property, ['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id', 'forwarded', ...$this->studentProfileFilterProperties()], true)) {
             $this->resetPage();
         }
     }
@@ -80,7 +88,7 @@ class Index extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id', ...$this->studentProfileFilterProperties()]);
+        $this->reset(['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id', 'forwarded', ...$this->studentProfileFilterProperties()]);
         $this->resetPage();
     }
 
@@ -95,6 +103,7 @@ class Index extends Component
             || $this->date_from !== ''
             || $this->date_to !== ''
             || $this->department_id !== ''
+            || $this->forwarded !== ''
             || $this->hasStudentProfileFilters();
     }
 
@@ -137,7 +146,9 @@ class Index extends Component
             ->when($this->semester !== '', fn (Builder $query) => $query->where('semester_at_submission', $this->semester))
             ->when($this->date_from !== '', fn (Builder $query) => $query->whereDate('created_at', '>=', $this->date_from))
             ->when($this->date_to !== '', fn (Builder $query) => $query->whereDate('created_at', '<=', $this->date_to))
-            ->when($this->isSuperAdmin() && $this->department_id !== '', fn (Builder $query) => $query->where('department_id', $this->department_id));
+            ->when($this->isSuperAdmin() && $this->department_id !== '', fn (Builder $query) => $query->where('department_id', $this->department_id))
+            ->when($this->forwarded === 'any', fn (Builder $query) => $query->whereNotNull('forwarded_to'))
+            ->when(ForwardTarget::tryFrom($this->forwarded) !== null, fn (Builder $query) => $query->where('forwarded_to', $this->forwarded));
 
         if ($this->sort === 'priority') {
             $query->orderByPrioritySeverity($this->direction);

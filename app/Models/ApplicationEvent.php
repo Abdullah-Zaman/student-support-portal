@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ApplicationEventType;
+use App\Enums\ForwardTarget;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
@@ -69,6 +70,7 @@ class ApplicationEvent extends Model
             ApplicationEventType::Resolved => __(':number was marked resolved.', ['number' => $applicationNo]),
             ApplicationEventType::Closed => __(':number was closed.', ['number' => $applicationNo]),
             ApplicationEventType::Rejected => __(':number was rejected.', ['number' => $applicationNo]),
+            ApplicationEventType::Forwarded => __(':number was forwarded to the :target for review.', ['number' => $applicationNo, 'target' => $this->forwardTargetLabel()]),
         };
     }
 
@@ -96,7 +98,17 @@ class ApplicationEvent extends Model
             ApplicationEventType::Resolved => __('Application resolved.'),
             ApplicationEventType::Closed => __('Application closed.'),
             ApplicationEventType::Rejected => __('Application rejected.'),
+            ApplicationEventType::Forwarded => __('Forwarded to the :target.', ['target' => $this->forwardTargetLabel()]),
         };
+    }
+
+    /**
+     * "HOD", "Dean" or "Registrar" for a Forwarded event. Only the
+     * destination is ever shown; the note and remarks stay staff-only.
+     */
+    private function forwardTargetLabel(): string
+    {
+        return ForwardTarget::tryFrom((string) $this->to_value)?->label() ?? self::humanizeValue((string) $this->to_value);
     }
 
     /**

@@ -22,6 +22,8 @@ class DashboardController extends Controller
             $user->hasRole(RoleName::SuperAdmin->value) => redirect()->route('super-admin.dashboard'),
             $user->hasRole(RoleName::AdminOfficer->value) => redirect()->route('admin.dashboard'),
             $user->hasRole(RoleName::Student->value) => redirect()->route('student.dashboard'),
+            $user->hasRole(RoleName::Hod->value) => redirect()->route('hod.dashboard'),
+            $user->hasRole(RoleName::Dean->value) => redirect()->route('dean.dashboard'),
             default => view('dashboard'),
         };
     }

@@ -102,6 +102,8 @@ class DemoSeeder extends Seeder
         }
 
         self::createAnnouncements($department->id, $adminUserId);
+
+        $this->call(DemoForwardingSeeder::class);
     }
 
     /**
