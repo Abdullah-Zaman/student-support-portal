@@ -105,9 +105,12 @@ class FortifyServiceProvider extends ServiceProvider
     }
 
     /**
-     * Only block suspended accounts at login. Unverified accounts are
-     * allowed to authenticate — the "verified" middleware is what confines
-     * them to the verification-notice page until they verify.
+     * Block suspended accounts at login, and — when STAFF_PASSWORD_LOGIN
+     * is off — Admin Officers, HODs and Deans, who then sign in with
+     * Google (the Super Admin keeps password login as a fallback).
+     * Unverified accounts are allowed to authenticate — the "verified"
+     * middleware is what confines them to the verification-notice page
+     * until they verify.
      */
     private function configureAuthentication(): void
     {
@@ -121,6 +124,12 @@ class FortifyServiceProvider extends ServiceProvider
             if ($user->status === UserStatus::Suspended) {
                 throw ValidationException::withMessages([
                     Fortify::username() => 'Your account has been suspended. Contact the SE Department Admin Office.',
+                ]);
+            }
+
+            if (! config('google.staff_password_login') && $user->isGoogleOnlyStaff()) {
+                throw ValidationException::withMessages([
+                    Fortify::username() => 'Staff sign in with Google. Use the "Sign in with Google" button.',
                 ]);
             }
 

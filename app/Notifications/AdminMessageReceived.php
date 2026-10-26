@@ -23,8 +23,8 @@ class AdminMessageReceived extends ApplicationStudentNotification
         ]);
     }
 
-    protected function extraLines(): array
+    protected function adminMessage(): ?string
     {
-        return [$this->body];
+        return $this->body;
     }
 }

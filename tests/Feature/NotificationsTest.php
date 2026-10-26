@@ -252,7 +252,7 @@ test('the branded mail layout actually renders, with the logo and a view-applica
 
     $html = (string) (new ApplicationClosed($application))->toMail($student)->render();
 
-    expect($html)->toContain('superior-logo-white.svg');
+    expect($html)->toContain('superior-logo-white.png');
     expect($html)->toContain(__('View application'));
     expect($html)->toContain(route('student.applications.show', $application));
 });

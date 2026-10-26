@@ -4,6 +4,7 @@ use App\Enums\RoleName;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\AnnouncementFileController;
 use App\Http\Controllers\ApplicationAttachmentController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
@@ -38,6 +39,20 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
 })->name('home');
+
+/*
+ * Google OAuth for staff: sign in (guests) and connecting Gmail (staff;
+ * the controller authorizes). Both come back through one callback URL.
+ */
+Route::get('auth/google/login', [GoogleAuthController::class, 'login'])
+    ->middleware(['guest', 'throttle:10,1'])
+    ->name('google.login');
+Route::get('auth/google/connect', [GoogleAuthController::class, 'connect'])
+    ->middleware(['auth', 'verified', 'throttle:10,1'])
+    ->name('google.connect');
+Route::get('auth/google/callback', [GoogleAuthController::class, 'callback'])
+    ->middleware('throttle:10,1')
+    ->name('google.callback');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

@@ -236,6 +236,14 @@
         </flux:header>
 
         <flux:main container>
+            @if (auth()->user()?->googleAccount?->needs_reconnect)
+                <div class="mb-5 flex flex-wrap items-center gap-3 rounded-[14px] border border-[#F2D49B] bg-[#FFF1D6] px-4 py-3 text-sm text-[#7A4A00]" role="alert" data-test="gmail-reconnect-banner">
+                    <flux:icon icon="exclamation-triangle" variant="mini" class="size-5 shrink-0" />
+                    <span class="flex-1">{{ __('Reconnect your Gmail. Google no longer accepts the portal\'s access, so forward emails cannot be sent.') }}</span>
+                    <flux:button size="sm" :href="route('google.connect')">{{ __('Reconnect Gmail') }}</flux:button>
+                </div>
+            @endif
+
             {{ $slot }}
         </flux:main>
 

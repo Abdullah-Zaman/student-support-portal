@@ -3,9 +3,10 @@
 namespace App\Enums;
 
 /**
- * Email delivery of a forward. Forwards to an HOD or Dean are delivered
- * inside the portal; forwards to the Registrar wait for Phase D's Gmail
- * sending, which will move them to sent or failed.
+ * Email delivery of a forward. Every forward is emailed from the
+ * forwarder's own Gmail: it starts as pending and becomes sent or
+ * failed. NotRequired remains on HOD/Dean forwards recorded before
+ * forwards were emailed.
  */
 enum ForwardEmailStatus: string
 {

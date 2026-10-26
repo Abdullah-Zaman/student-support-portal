@@ -114,7 +114,7 @@
 
                 @if ($this->forwardOptions !== [])
                     <x-panel :title="__('Forward onward')">
-                        <x-forward-form :options="$this->forwardOptions" />
+                        <x-forward-form :options="$this->forwardOptions" :gmailRequiredMessage="$this->gmailRequiredMessage" />
                     </x-panel>
                 @endif
             @endif

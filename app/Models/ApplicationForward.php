@@ -24,6 +24,10 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property string|null $to_email
  * @property string $note
  * @property ForwardEmailStatus $email_status
+ * @property int $email_attempts
+ * @property string|null $email_error
+ * @property Carbon|null $emailed_at
+ * @property string|null $gmail_message_id
  * @property Carbon $created_at
  */
 class ApplicationForward extends Model
@@ -41,6 +45,10 @@ class ApplicationForward extends Model
         'to_email',
         'note',
         'email_status',
+        'email_attempts',
+        'email_error',
+        'emailed_at',
+        'gmail_message_id',
     ];
 
     protected function casts(): array
@@ -49,6 +57,7 @@ class ApplicationForward extends Model
             'from_role' => RoleName::class,
             'to_role' => ForwardTarget::class,
             'email_status' => ForwardEmailStatus::class,
+            'emailed_at' => 'datetime',
             'created_at' => 'datetime',
         ];
     }

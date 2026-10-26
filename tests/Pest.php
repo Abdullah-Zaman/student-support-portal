@@ -8,6 +8,7 @@ use App\Models\ApplicationCategory;
 use App\Models\ApplicationForward;
 use App\Models\Department;
 use App\Models\Faculty;
+use App\Models\GoogleAccount;
 use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
@@ -16,6 +17,7 @@ use Database\Seeders\FacultySeeder;
 use Database\Seeders\ProgramSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Permission\Models\Role;
@@ -224,6 +226,28 @@ function createDean(?Faculty $faculty = null): User
     $user->assignRole(RoleName::Dean->value);
 
     return $user;
+}
+
+/**
+ * Give a staff member a connected Gmail (forwards require one).
+ */
+function connectGmail(User $user): GoogleAccount
+{
+    return GoogleAccount::factory()->create(['user_id' => $user->id, 'google_email' => $user->email]);
+}
+
+/**
+ * Fake Google's token, revoke and Gmail send endpoints, and fail on any
+ * other outgoing HTTP request.
+ */
+function fakeGmailApi(): void
+{
+    Http::preventStrayRequests();
+    Http::fake([
+        'oauth2.googleapis.com/token' => Http::response(['access_token' => 'ya29.refreshed', 'expires_in' => 3599]),
+        'oauth2.googleapis.com/revoke' => Http::response(),
+        'gmail.googleapis.com/upload/gmail/v1/users/me/messages/send*' => Http::response(['id' => 'gmail-message-1']),
+    ]);
 }
 
 /**

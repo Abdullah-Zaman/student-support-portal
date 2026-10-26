@@ -6,10 +6,11 @@ use App\Listeners\ActivateVerifiedUser;
 use App\Listeners\LogOutOtherSessionsOnPasswordReset;
 use App\Listeners\RecordFailedLogin;
 use App\Listeners\RecordSuccessfulLogin;
+use App\Models\User;
 use App\Policies\ActivityPolicy;
 use App\Support\BrandedMailMessage;
 use App\Support\Forwarding\ForwardMailer;
-use App\Support\Forwarding\LogForwardMailer;
+use App\Support\Forwarding\GmailForwardMailer;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
@@ -34,7 +35,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(ForwardMailer::class, LogForwardMailer::class);
+        $this->app->bind(ForwardMailer::class, GmailForwardMailer::class);
     }
 
     /**
@@ -46,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
         $this->configureMailSafety();
 
         Gate::policy(Activity::class, ActivityPolicy::class);
+
+        Gate::define('manage-gmail', fn (User $user): bool => $user->staffRole() !== null);
 
         Event::listen(Verified::class, ActivateVerifiedUser::class);
         Event::listen(Login::class, RecordSuccessfulLogin::class);

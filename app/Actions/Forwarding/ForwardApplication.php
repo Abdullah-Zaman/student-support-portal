@@ -23,7 +23,9 @@ use Illuminate\Validation\ValidationException;
  * ApplicationPolicy's job; the caller authorizes first). The status is
  * left unchanged. The HOD/Dean gets a notification, the student a short
  * one with no note, and the Admin Officers one when an HOD or Dean
- * passes it on. Every forward is handed to the ForwardMailer.
+ * passes it on. Every forward is handed to the ForwardMailer, which
+ * emails it from the sender's own Gmail, so a sender without a usable
+ * Gmail connection cannot forward.
  */
 class ForwardApplication
 {
@@ -55,10 +57,14 @@ class ForwardApplication
     }
 
     /**
-     * @throws ValidationException when the target has no recipient
+     * @throws ValidationException when the sender has no usable Gmail or the target has no recipient
      */
     public function handle(Application $application, User $sender, ForwardTarget $target, string $note): ApplicationForward
     {
+        if (! $sender->hasConnectedGmail()) {
+            throw ValidationException::withMessages(['forward_target' => self::gmailRequiredMessage($sender)]);
+        }
+
         $reason = $this->unavailableReason($application, $target);
 
         if ($reason !== null) {
@@ -81,7 +87,7 @@ class ForwardApplication
                 'to_user_id' => $recipient?->id,
                 'to_email' => $target === ForwardTarget::Registrar ? self::registrarEmail() : null,
                 'note' => $note,
-                'email_status' => $target === ForwardTarget::Registrar ? ForwardEmailStatus::PendingEmail : ForwardEmailStatus::NotRequired,
+                'email_status' => ForwardEmailStatus::PendingEmail,
             ]);
 
             $application->update(['forwarded_to' => $target]);
@@ -111,6 +117,31 @@ class ForwardApplication
         $this->mailer->send($forward);
 
         return $forward;
+    }
+
+    /**
+     * Send a pending or failed forward email again (the caller authorizes
+     * first). Old "pending email" Registrar forwards go out this way once
+     * the forwarder has connected Gmail.
+     *
+     * @throws ValidationException when the forwarder has no usable Gmail
+     */
+    public function resendEmail(ApplicationForward $forward): void
+    {
+        if (! $forward->sender->hasConnectedGmail()) {
+            throw ValidationException::withMessages(['forward_email' => self::gmailRequiredMessage($forward->sender)]);
+        }
+
+        $forward->update(['email_status' => ForwardEmailStatus::PendingEmail, 'email_error' => null]);
+
+        $this->mailer->send($forward);
+    }
+
+    public static function gmailRequiredMessage(User $sender): string
+    {
+        return $sender->googleAccount?->needs_reconnect
+            ? __('Reconnect your Gmail first: Settings → Profile → Connected Gmail. Forwards are emailed from your own Gmail.')
+            : __('Connect your Gmail first: Settings → Profile → Connected Gmail. Forwards are emailed from your own Gmail.');
     }
 
     public static function registrarEmail(): ?string

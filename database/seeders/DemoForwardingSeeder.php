@@ -101,9 +101,9 @@ class DemoForwardingSeeder extends Seeder
                     'to_role' => $target,
                     'to_user_id' => $recipient->id,
                     'note' => $note,
-                    'email_status' => ForwardEmailStatus::NotRequired,
+                    'email_status' => ForwardEmailStatus::Sent,
                 ]);
-                $forward->forceFill(['created_at' => $at])->save();
+                $forward->forceFill(['created_at' => $at, 'emailed_at' => $at])->save();
 
                 $application->update(['forwarded_to' => $target]);
 

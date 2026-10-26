@@ -26,8 +26,8 @@ class ApplicationInfoRequested extends ApplicationStudentNotification
             : __('The Admin Office needs more information from you on :number.', ['number' => $this->application->application_no]);
     }
 
-    protected function extraLines(): array
+    protected function adminMessage(): ?string
     {
-        return [$this->body];
+        return $this->body;
     }
 }

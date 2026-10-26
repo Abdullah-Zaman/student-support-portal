@@ -3,12 +3,14 @@
 namespace App\Concerns;
 
 use App\Actions\Forwarding\ForwardApplication;
+use App\Enums\ForwardEmailStatus;
 use App\Enums\ForwardTarget;
 use App\Models\ApplicationForward;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 
 /**
@@ -63,6 +65,49 @@ trait ForwardsApplications
             ->with(['sender', 'recipient', 'remarks.author'])
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * Forwards are emailed from the forwarder's own Gmail, so without a
+     * usable connection the form shows this instead. Null when ready.
+     */
+    #[Computed]
+    public function gmailRequiredMessage(): ?string
+    {
+        $user = Auth::user();
+
+        return $user->hasConnectedGmail() ? null : ForwardApplication::gmailRequiredMessage($user);
+    }
+
+    /**
+     * Send (or retry) the email of one of this user's own forwards on
+     * this application that is pending or failed.
+     */
+    public function sendForwardEmail(int $forwardId, ForwardApplication $forwardApplication): void
+    {
+        $forward = $this->application->forwards()->findOrFail($forwardId);
+
+        $this->authorize('sendEmail', $forward);
+
+        try {
+            $forwardApplication->resendEmail($forward);
+        } catch (ValidationException $exception) {
+            Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
+
+            return;
+        }
+
+        unset($this->forwards);
+
+        $forward->refresh();
+
+        if ($forward->email_status === ForwardEmailStatus::Sent) {
+            Flux::toast(variant: 'success', text: __('Forward email sent.'));
+        } elseif ($forward->email_status === ForwardEmailStatus::Failed) {
+            Flux::toast(variant: 'danger', text: (string) $forward->email_error);
+        } else {
+            Flux::toast(text: __('Forward email queued for sending.'));
+        }
     }
 
     public function forward(ForwardApplication $forwardApplication): void

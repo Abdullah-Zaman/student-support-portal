@@ -14,11 +14,36 @@
                     <span class="text-sm font-semibold text-ink">
                         {{ __(':from → :to', ['from' => __($forward->from_role->label()), 'to' => __($forward->to_role->label())]) }}
                     </span>
-                    @if ($forward->email_status === \App\Enums\ForwardEmailStatus::PendingEmail)
-                        <flux:badge color="amber" size="sm" icon="envelope">{{ __($forward->email_status->label()) }}</flux:badge>
+                    @php
+                        $emailBadgeColor = match ($forward->email_status) {
+                            \App\Enums\ForwardEmailStatus::PendingEmail => 'amber',
+                            \App\Enums\ForwardEmailStatus::Sent => 'green',
+                            \App\Enums\ForwardEmailStatus::Failed => 'red',
+                            \App\Enums\ForwardEmailStatus::NotRequired => null,
+                        };
+                    @endphp
+                    @if ($emailBadgeColor)
+                        <flux:badge :color="$emailBadgeColor" size="sm" icon="envelope">{{ __($forward->email_status->label()) }}</flux:badge>
                     @endif
                     <span class="text-[13px] text-subtle">{{ $forward->created_at->format('j M Y, g:i A') }}</span>
                 </div>
+
+                @if ($forward->email_status === \App\Enums\ForwardEmailStatus::Failed && $forward->email_error)
+                    <p class="m-0 text-[13px] text-red-700" data-test="forward-email-error-{{ $forward->id }}">{{ $forward->email_error }}</p>
+                @endif
+
+                @can('sendEmail', $forward)
+                    <flux:button
+                        size="sm"
+                        icon="paper-airplane"
+                        class="self-start"
+                        wire:click="sendForwardEmail({{ $forward->id }})"
+                        wire:loading.attr="disabled"
+                        data-test="send-forward-email-{{ $forward->id }}"
+                    >
+                        {{ $forward->email_status === \App\Enums\ForwardEmailStatus::Failed ? __('Retry email') : __('Send email') }}
+                    </flux:button>
+                @endcan
 
                 <p class="m-0 text-[13px] text-subtle">
                     {{ __('By :name', ['name' => $forward->sender->name]) }}

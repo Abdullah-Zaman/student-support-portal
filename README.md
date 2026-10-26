@@ -138,7 +138,49 @@ Any environment that is **not** `production` (local, staging, a demo server) but
 MAIL_ALWAYS_TO=your-catch-all-inbox@example.com
 ```
 
-This has no effect when `APP_ENV=production` — leave it blank there. See `App\Providers\AppServiceProvider::configureMailSafety()`.
+This has no effect when `APP_ENV=production` — leave it blank there. See `App\Providers\AppServiceProvider::configureMailSafety()`. It also applies to forward emails sent through the Gmail API (see below).
+
+## Google sign-in and Connected Gmail (staff)
+
+Staff (Admin Officer, HOD, Dean, Super Admin) can sign in with Google, and each staff member connects their own Gmail once so that forwards are emailed **from their own account**. The portal only asks for the `gmail.send` scope (it can send, never read), never stores a Google password, and keeps the OAuth tokens encrypted. Disconnecting revokes the access at Google and deletes the tokens.
+
+### Google Cloud setup
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable the **Gmail API**.
+2. Configure the OAuth consent screen (Internal for a Google Workspace domain) with the scopes `openid`, `email`, `profile` and `https://www.googleapis.com/auth/gmail.send`.
+3. Create an OAuth client ID of type **Web application** and add the redirect URI, e.g. `https://portal.example.edu.pk/auth/google/callback`.
+4. Set in `.env`:
+
+   ```env
+   GOOGLE_CLIENT_ID=...
+   GOOGLE_CLIENT_SECRET=...
+   GOOGLE_REDIRECT_URI=https://portal.example.edu.pk/auth/google/callback
+   ```
+
+### Settings
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `STAFF_GOOGLE_DOMAINS` | `superior.edu.pk` | Comma-separated domains whose Google accounts may sign in as staff. Google sign-in never creates users: the account must match an active staff user by portal email or by connected Google email. Students always use their password login. |
+| `STAFF_PASSWORD_LOGIN` | `true` locally, `false` in production | When `false`, Admin Officers, HODs and Deans can only sign in with Google. The Super Admin always keeps password login as a fallback. |
+| `GOOGLE_ALLOW_EMAIL_MISMATCH` | `false` | Local testing only: allows connecting a Google account whose address differs from the portal email (e.g. a personal Gmail). Ignored in production. |
+
+### Local testing
+
+Google does not accept `.test` redirect URIs, so test OAuth on `http://localhost:8000`:
+
+```env
+APP_URL=http://localhost:8000
+GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
+GOOGLE_ALLOW_EMAIL_MISMATCH=true   # only if you use personal Gmail accounts
+MAIL_ALWAYS_TO=your-inbox@example.com
+```
+
+Then run `php artisan serve` and a queue worker (`php artisan queue:listen`), or simply `composer run dev`.
+
+### Forward emails
+
+Every forward (Admin Officer → HOD/Dean, HOD → Dean/Registrar, Dean → Registrar) is emailed from the forwarder's connected Gmail, as well as the in-portal notification. A staff member without a connected Gmail cannot forward. The email includes the application, student details, the earlier forward/remark chain and the attachments (up to 15 MB in total; larger files are listed by name with a link to the portal). Each forward shows its email status (pending, sent, failed); the forwarder can send a pending email or retry a failed one from the forward chain. If Google revokes the access, the staff member sees a "Reconnect your Gmail" banner.
 
 ## File uploads
 
@@ -157,6 +199,7 @@ This matches the local Herd `php.ini` the application was built against. Files a
 - [ ] Real `SEED_SUPER_ADMIN_*` / `SEED_ADMIN_OFFICER_*` credentials before running `php artisan db:seed` (the default password is refused in production)
 - [ ] `MAIL_ALWAYS_TO` left **blank**
 - [ ] Gmail/Google Workspace SMTP configured with a real App Password (see [Mail](#mail))
+- [ ] Google OAuth client configured with the production redirect URI, `GOOGLE_ALLOW_EMAIL_MISMATCH=false` (see [Google sign-in](#google-sign-in-and-connected-gmail-staff))
 - [ ] `upload_max_filesize` / `post_max_size` raised per [File uploads](#file-uploads)
 - [ ] A persistent queue worker running (e.g. `php artisan queue:work` under Supervisor) — `queue:listen` is for local development only
 - [ ] `php artisan migrate --force` run against the production database

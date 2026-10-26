@@ -11,8 +11,10 @@ beforeEach(function () {
 });
 
 test('a student sees where their application was forwarded but never the note or any remark', function () {
+    fakeGmailApi();
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
+    connectGmail($admin);
     $hod = createHod($department);
     $student = createStudentUser($department);
     $application = createApplicationInDepartment($department, $student);

@@ -245,7 +245,7 @@
         <aside class="flex min-w-0 flex-1 basis-80 flex-col gap-6">
             @if (! $this->isFinal && $this->forwardOptions !== [])
                 <x-panel :title="__('Forward')">
-                    <x-forward-form :options="$this->forwardOptions" />
+                    <x-forward-form :options="$this->forwardOptions" :gmailRequiredMessage="$this->gmailRequiredMessage" />
                 </x-panel>
             @endif
 

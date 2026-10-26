@@ -111,6 +111,34 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * A staff member's connected Gmail (for sending forwards).
+     *
+     * @return HasOne<GoogleAccount, $this>
+     */
+    public function googleAccount(): HasOne
+    {
+        return $this->hasOne(GoogleAccount::class);
+    }
+
+    /**
+     * Connected and still usable — Google has not revoked or expired it.
+     */
+    public function hasConnectedGmail(): bool
+    {
+        return $this->googleAccount !== null && ! $this->googleAccount->needs_reconnect;
+    }
+
+    /**
+     * Admin Officer, HOD or Dean: the staff who lose password login when
+     * STAFF_PASSWORD_LOGIN is false. The Super Admin always keeps it.
+     */
+    public function isGoogleOnlyStaff(): bool
+    {
+        return ! $this->hasRole(RoleName::SuperAdmin->value)
+            && $this->hasAnyRole([RoleName::AdminOfficer->value, RoleName::Hod->value, RoleName::Dean->value]);
+    }
+
+    /**
      * @return HasMany<ApplicationMessage, $this>
      */
     public function sentMessages(): HasMany

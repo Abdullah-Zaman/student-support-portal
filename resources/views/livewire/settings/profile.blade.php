@@ -28,5 +28,11 @@
                 <flux:button variant="primary" type="submit">{{ __('Save') }}</flux:button>
             </div>
         </form>
+
+        @can('manage-gmail')
+            <flux:separator class="my-6" />
+
+            <livewire:settings.connected-gmail />
+        @endcan
     </x-settings.layout>
 </section>

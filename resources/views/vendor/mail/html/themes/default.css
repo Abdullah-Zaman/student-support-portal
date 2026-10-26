@@ -290,6 +290,58 @@ img {
     padding-bottom: 0;
 }
 
+/* Application number + subject */
+
+.application-summary {
+    margin: 4px 0 21px;
+}
+
+.application-summary-content {
+    background-color: #F6F4F5;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.application-number {
+    color: #1F1A1E;
+    font-size: 15px;
+    font-weight: bold;
+    margin: 0;
+}
+
+.application-subject {
+    color: #3B3339;
+    font-size: 14px;
+    margin: 4px 0 0;
+}
+
+/* Highlighted admin message */
+
+.highlight {
+    margin: 4px 0 21px;
+}
+
+.highlight-content {
+    background-color: #F7EFF5;
+    border: 1px solid #E3CFDD;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.highlight-title {
+    color: #875A7B;
+    font-size: 13px;
+    font-weight: bold;
+    margin: 0 0 6px;
+}
+
+.highlight-body {
+    color: #1F1A1E;
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+}
+
 /* Utilities */
 
 .break-all {

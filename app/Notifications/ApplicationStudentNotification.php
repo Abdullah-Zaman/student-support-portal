@@ -38,6 +38,11 @@ abstract class ApplicationStudentNotification extends Notification implements Sh
     public function toMail(User $notifiable): MailMessage
     {
         $message = (new MailMessage)
+            ->markdown('notifications::email', [
+                'applicationNo' => $this->application->application_no,
+                'applicationSubject' => $this->application->subject,
+                'adminMessage' => $this->adminMessage(),
+            ])
             ->greeting(__('Hello :name,', ['name' => $notifiable->name]))
             ->line($this->message())
             ->action(__('View application'), route('student.applications.show', $this->application));
@@ -76,5 +81,14 @@ abstract class ApplicationStudentNotification extends Notification implements Sh
     protected function extraLines(): array
     {
         return [];
+    }
+
+    /**
+     * The Admin Office's own words (a message or an info/document
+     * request), shown in a highlighted box above the button. Mail only.
+     */
+    protected function adminMessage(): ?string
+    {
+        return null;
     }
 }

@@ -1,8 +1,9 @@
+@props(['logo' => null])
 <x-mail::layout>
 {{-- Header --}}
 <x-slot:header>
 <x-mail::header :url="config('app.url')">
-<img src="{{ asset('images/superior-logo-white.svg') }}" class="logo" alt="{{ config('app.name') }}" style="height: 40px; width: auto;">
+<img src="{{ $logo ?? asset(\App\Support\MailLogo::PATH) }}" class="logo" alt="{{ config('app.name') }}" height="40" style="height: 40px; width: auto;">
 </x-mail::header>
 </x-slot:header>
 
@@ -21,7 +22,7 @@
 {{-- Footer --}}
 <x-slot:footer>
 <x-mail::footer>
-© {{ date('Y') }} {{ config('app.name') }}. {{ __('All rights reserved.') }}
+© {{ date('Y') }} {{ __('SE Department, Superior University') }}
 </x-mail::footer>
 </x-slot:footer>
 </x-mail::layout>

@@ -29,6 +29,7 @@ test('an admin officer forwards an application to their HOD without changing its
     app()->instance(ForwardMailer::class, $mailer);
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
+    connectGmail($admin);
     $hod = createHod($department);
     $student = createStudentUser($department);
     $application = createApplicationInDepartment($department, $student);
@@ -45,7 +46,7 @@ test('an admin officer forwards an application to their HOD without changing its
     expect($forward->to_role)->toBe(ForwardTarget::Hod)
         ->and($forward->to_user_id)->toBe($hod->id)
         ->and($forward->from_user_id)->toBe($admin->id)
-        ->and($forward->email_status)->toBe(ForwardEmailStatus::NotRequired)
+        ->and($forward->email_status)->toBe(ForwardEmailStatus::PendingEmail)
         ->and($application->refresh()->status)->toBe(ApplicationStatus::UnderReview)
         ->and($application->forwarded_to)->toBe(ForwardTarget::Hod);
 
@@ -67,6 +68,7 @@ test('an admin officer forwards an application to their HOD without changing its
 test('a forward is blocked with a clear message when the department has no active HOD', function () {
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
+    connectGmail($admin);
     $suspendedHod = createHod($department);
     $suspendedHod->update(['status' => 'suspended']);
     $application = createApplicationInDepartment($department, createStudentUser($department));
@@ -89,12 +91,14 @@ test('a forward to the Dean is blocked when the faculty has no active Dean', fun
     expect(app(ForwardApplication::class)->unavailableReason($application, ForwardTarget::Dean))->toBe('No active Dean for this faculty.');
 });
 
-test('an HOD forwards to the Registrar as pending email and the admin officers are told', function () {
+test('an HOD forwards to the Registrar by email and the admin officers are told', function () {
     Notification::fake();
+    fakeGmailApi();
     Setting::set(ForwardApplication::REGISTRAR_EMAIL_SETTING, 'registrar@superior.edu.pk');
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     $hod = createHod($department);
+    connectGmail($hod);
     $application = createApplicationInDepartment($department, createStudentUser($department));
     recordForward($application, ForwardTarget::Hod, $admin);
 
@@ -106,7 +110,7 @@ test('an HOD forwards to the Registrar as pending email and the admin officers a
         ->assertHasNoErrors();
 
     $forward = ApplicationForward::query()->where('to_role', ForwardTarget::Registrar)->sole();
-    expect($forward->email_status)->toBe(ForwardEmailStatus::PendingEmail)
+    expect($forward->email_status)->toBe(ForwardEmailStatus::Sent)
         ->and($forward->to_email)->toBe('registrar@superior.edu.pk')
         ->and($forward->to_user_id)->toBeNull()
         ->and($application->refresh()->forwarded_to)->toBe(ForwardTarget::Registrar);
@@ -117,6 +121,7 @@ test('an HOD forwards to the Registrar as pending email and the admin officers a
 test('a forward to the Registrar is blocked until the Registrar email is set', function () {
     $department = Department::factory()->create();
     $hod = createHod($department);
+    connectGmail($hod);
     $application = createApplicationInDepartment($department, createStudentUser($department));
     recordForward($application, ForwardTarget::Hod, createAdminOfficer($department));
 
