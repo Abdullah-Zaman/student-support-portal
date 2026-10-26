@@ -4,10 +4,14 @@ namespace App\Livewire\Auth;
 
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\RegistrationValidationRules;
+use App\Models\Program;
+use App\Support\RegistrationNumber;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -130,6 +134,21 @@ class Register extends Component
             'password' => $this->passwordRules(),
             default => null,
         };
+    }
+
+    /**
+     * @return Collection<int, Program>
+     */
+    #[Computed]
+    public function programs(): Collection
+    {
+        return Program::withoutGlobalScopes()->openForRegistration()->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function registrationNoExample(): string
+    {
+        return RegistrationNumber::example($this->program ?: ($this->programs()->first()->code ?? 'BSSE'));
     }
 
     public function register(CreatesNewUsers $creator, StatefulGuard $guard): void

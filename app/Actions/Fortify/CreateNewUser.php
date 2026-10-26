@@ -6,9 +6,10 @@ use App\Concerns\PasswordValidationRules;
 use App\Concerns\RegistrationValidationRules;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
-use App\Models\Department;
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\RegistrationNumber;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
@@ -18,7 +19,8 @@ class CreateNewUser implements CreatesNewUsers
     use PasswordValidationRules, RegistrationValidationRules;
 
     /**
-     * Validate and create a newly registered student account.
+     * Validate and create a newly registered student account. The
+     * student's department is the department of the chosen program.
      *
      * @param  array<string, string>  $input
      */
@@ -36,18 +38,16 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ], $this->registrationMessages())->validate();
 
-        $pattern = config('students.registration_no_pattern');
-        preg_match($pattern, $validated['registration_no'], $matches);
-        $batch = $matches[2];
+        $batch = RegistrationNumber::parse($validated['registration_no'])['batch'] ?? '';
 
-        $department = Department::query()->where('code', 'SE')->firstOrFail();
+        $program = Program::withoutGlobalScopes()->where('code', $validated['program'])->firstOrFail();
 
-        return DB::transaction(function () use ($validated, $batch, $department) {
+        return DB::transaction(function () use ($validated, $batch, $program) {
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => strtolower($validated['email']),
                 'password' => $validated['password'],
-                'department_id' => $department->id,
+                'department_id' => $program->department_id,
                 'status' => UserStatus::PendingVerification,
             ]);
 
@@ -56,7 +56,7 @@ class CreateNewUser implements CreatesNewUsers
             Student::create([
                 'user_id' => $user->id,
                 'registration_no' => $validated['registration_no'],
-                'program' => config('students.programs')[$validated['program']],
+                'program_id' => $program->id,
                 'current_semester' => $validated['current_semester'],
                 'batch' => $batch,
             ]);

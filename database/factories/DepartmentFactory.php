@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Department;
+use App\Models\Faculty;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -19,8 +20,10 @@ class DepartmentFactory extends Factory
     public function definition(): array
     {
         return [
+            'faculty_id' => Faculty::factory(),
             'name' => fake()->unique()->company(),
             'code' => Str::upper(fake()->unique()->lexify('???')),
+            'is_active' => true,
         ];
     }
 }

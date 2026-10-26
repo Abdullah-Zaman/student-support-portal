@@ -21,6 +21,9 @@ use App\Livewire\Student\Profile as StudentProfile;
 use App\Livewire\SuperAdmin\AdminOfficers\Index as SuperAdminAdminOfficersIndex;
 use App\Livewire\SuperAdmin\AuditLog\Index as SuperAdminAuditLogIndex;
 use App\Livewire\SuperAdmin\Categories\Index as SuperAdminCategoriesIndex;
+use App\Livewire\SuperAdmin\Departments\Index as SuperAdminDepartmentsIndex;
+use App\Livewire\SuperAdmin\Faculties\Index as SuperAdminFacultiesIndex;
+use App\Livewire\SuperAdmin\Programs\Index as SuperAdminProgramsIndex;
 use App\Livewire\SuperAdmin\Settings\Edit as SuperAdminSettingsEdit;
 use Illuminate\Support\Facades\Route;
 
@@ -83,6 +86,10 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
         Route::livewire('students/{student}', AdminStudentsShow::class)->name('students.show');
 
         Route::livewire('categories', SuperAdminCategoriesIndex::class)->name('categories.index');
+
+        Route::livewire('faculties', SuperAdminFacultiesIndex::class)->name('faculties.index');
+        Route::livewire('departments', SuperAdminDepartmentsIndex::class)->name('departments.index');
+        Route::livewire('programs', SuperAdminProgramsIndex::class)->name('programs.index');
 
         Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
         Route::livewire('announcements', AdminAnnouncementsIndex::class)->name('announcements.index');

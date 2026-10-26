@@ -1,15 +1,20 @@
 <?php
 
 use App\Enums\UserStatus;
+use App\Livewire\Auth\Register;
+use App\Livewire\SuperAdmin\Programs\Index as ProgramsIndex;
 use App\Models\Department;
+use App\Models\Faculty;
+use App\Models\Program;
 use App\Models\User;
 use Laravel\Fortify\Features;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->skipUnlessFortifyHas(Features::registration());
 
     createRoles();
-    Department::factory()->create(['code' => 'SE']);
+    seedAcademicStructure();
 });
 
 function validRegistrationData(array $overrides = []): array
@@ -48,7 +53,7 @@ test('a student can register with valid data', function () {
     $student = $user->student;
     expect($student)->not->toBeNull();
     expect($student->registration_no)->toBe('SU92-BSSEM-F22-171');
-    expect($student->program)->toBe('BS Software Engineering');
+    expect($student->program->code)->toBe('BSSE');
     expect($student->current_semester)->toBe(5);
     expect($student->batch)->toBe('F22');
 });
@@ -101,6 +106,78 @@ test('registration is rejected when the registration number program code does no
 
     $response->assertSessionHasErrors('registration_no');
     $this->assertGuest();
+});
+
+test('a program added by the super admin makes its registration numbers valid, in its own department', function () {
+    $computerScience = Department::query()->where('code', 'CS')->firstOrFail();
+    $computerScience->update(['is_active' => true]);
+    $bscsData = validRegistrationData([
+        'program' => 'BSCS',
+        'registration_no' => 'SU92-BSCSM-F24-012',
+        'email' => 'su92-bscsm-f24-012@superior.edu.pk',
+    ]);
+
+    $this->post(route('register.store'), $bscsData)->assertSessionHasErrors(['program', 'registration_no']);
+
+    Livewire::actingAs(createSuperAdmin())
+        ->test(ProgramsIndex::class)
+        ->call('startCreate')
+        ->set('department_id', (string) $computerScience->id)
+        ->set('code', 'bscs')
+        ->set('name', 'BS Computer Science')
+        ->call('save')
+        ->assertHasNoErrors();
+    auth()->logout();
+
+    $this->post(route('register.store'), $bscsData)->assertSessionHasNoErrors();
+
+    $user = User::query()->where('email', 'su92-bscsm-f24-012@superior.edu.pk')->firstOrFail();
+    expect($user->department_id)->toBe($computerScience->id);
+    expect($user->student->program->code)->toBe('BSCS');
+    expect($user->student->batch)->toBe('F24');
+});
+
+test('registration is rejected for a deactivated program', function () {
+    $this->post(route('register.store'), validRegistrationData(['registration_no' => 'NOT-VALID']));
+
+    Program::query()->where('code', 'BSSE')->firstOrFail()->update(['is_active' => false]);
+
+    $this->post(route('register.store'), validRegistrationData())
+        ->assertSessionHasErrors(['registration_no' => 'Registration is not open for this program.', 'program']);
+    $this->assertGuest();
+});
+
+test('registration is rejected for a program whose department or faculty is deactivated', function (string $model, string $code) {
+    $model::query()->where('code', $code)->firstOrFail()->update(['is_active' => false]);
+
+    $this->post(route('register.store'), validRegistrationData())
+        ->assertSessionHasErrors(['registration_no' => 'Registration is not open for this program.']);
+    $this->assertGuest();
+})->with([
+    'department' => [Department::class, 'SE'],
+    'faculty' => [Faculty::class, 'FOC'],
+]);
+
+test('only programs open for registration are offered on the registration form', function () {
+    Program::query()->where('code', 'BSDS')->firstOrFail()->update(['is_active' => false]);
+
+    Livewire::test(Register::class)
+        ->assertSee('BS Software Engineering')
+        ->assertDontSee('BS Data Science');
+});
+
+test('a student whose program, department and faculty were deactivated can still log in', function () {
+    $department = Department::query()->where('code', 'SE')->firstOrFail();
+    $student = createStudentUser($department);
+
+    Program::query()->update(['is_active' => false]);
+    $department->update(['is_active' => false]);
+    $department->faculty->update(['is_active' => false]);
+
+    $this->post(route('login.store'), ['email' => $student->email, 'password' => 'password'])
+        ->assertSessionHasNoErrors();
+
+    $this->assertAuthenticatedAs($student);
 });
 
 test('registration is rejected when the email is already taken', function () {

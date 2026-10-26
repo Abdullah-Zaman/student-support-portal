@@ -20,7 +20,7 @@
 
             <div class="flex flex-col gap-1">
                 <span class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Program') }}</span>
-                <span class="text-[15px] font-semibold text-ink">{{ auth()->user()->student->program }}</span>
+                <span class="text-[15px] font-semibold text-ink">{{ auth()->user()->student->program->name }}</span>
             </div>
 
             <div class="flex flex-col gap-1">

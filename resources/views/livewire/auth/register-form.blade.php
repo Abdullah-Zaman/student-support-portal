@@ -19,15 +19,15 @@
         <!-- Program -->
         <x-validated-field>
             <flux:select wire:model.live="program" wire:blur="blurred('program')" :label="__('Program')" :placeholder="__('Select your program')" required>
-                @foreach (config('students.programs') as $code => $label)
-                    <flux:select.option :value="$code">{{ $label }}</flux:select.option>
+                @foreach ($this->programs as $programOption)
+                    <flux:select.option :value="$programOption->code" wire:key="program-{{ $programOption->id }}">{{ $programOption->name }}</flux:select.option>
                 @endforeach
             </flux:select>
         </x-validated-field>
 
         <!-- Registration No. -->
         @php
-            $registrationNoExample = config('students.registration_no_examples')[$program] ?? config('students.registration_no_examples')['BSSE'];
+            $registrationNoExample = $this->registrationNoExample;
         @endphp
         <x-validated-field>
             <div class="flex flex-col gap-1">

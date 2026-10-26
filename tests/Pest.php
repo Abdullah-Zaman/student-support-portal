@@ -4,8 +4,12 @@ use App\Enums\RoleName;
 use App\Models\Application;
 use App\Models\ApplicationCategory;
 use App\Models\Department;
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
+use Database\Seeders\DepartmentSeeder;
+use Database\Seeders\FacultySeeder;
+use Database\Seeders\ProgramSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Spatie\Permission\Models\Role;
@@ -70,7 +74,17 @@ function createRoles(): void
 }
 
 /**
+ * The seeded academic structure: Faculty of Computing, the SE/IT/CS
+ * departments and the BSSE/BSDS/BSAI programs under SE.
+ */
+function seedAcademicStructure(): void
+{
+    test()->seed([FacultySeeder::class, DepartmentSeeder::class, ProgramSeeder::class]);
+}
+
+/**
  * A student user, with a Student profile, in the given (or a fresh) department.
+ * Their program is one of the department's programs.
  */
 function createStudentUser(?Department $department = null): User
 {
@@ -79,7 +93,10 @@ function createStudentUser(?Department $department = null): User
     $user = User::factory()->create(['department_id' => $department->id]);
     $user->assignRole(RoleName::Student->value);
 
-    Student::factory()->create(['user_id' => $user->id]);
+    $program = Program::withoutGlobalScopes()->where('department_id', $department->id)->first()
+        ?? Program::factory()->create(['department_id' => $department->id]);
+
+    Student::factory()->create(['user_id' => $user->id, 'program_id' => $program->id]);
 
     return $user->refresh();
 }

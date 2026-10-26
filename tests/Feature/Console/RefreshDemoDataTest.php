@@ -8,10 +8,12 @@ use App\Models\Application;
 use App\Models\ApplicationCategory;
 use App\Models\ApplicationEvent;
 use App\Models\Department;
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
 use Database\Seeders\ApplicationCategorySeeder;
 use Database\Seeders\DemoSeeder;
+use Database\Seeders\ProgramSeeder;
 use Illuminate\Support\Facades\Artisan;
 
 beforeEach(function () {
@@ -40,7 +42,7 @@ function seedUnrealisticDemoData(Department $department): void
         $student = Student::query()->create([
             'user_id' => $user->id,
             'registration_no' => "SU92-BSSEM-F22-{$i}99",
-            'program' => 'BS Software Engineering',
+            'program_id' => Program::query()->where('code', 'BSSE')->value('id'),
             'current_semester' => 5,
             'batch' => 'F22',
         ]);
@@ -58,7 +60,7 @@ function seedUnrealisticDemoData(Department $department): void
 
 test('demo:refresh rewrites demo students and applications without touching the protected account', function () {
     $department = Department::factory()->create(['code' => 'SE']);
-    $this->seed(ApplicationCategorySeeder::class);
+    $this->seed([ProgramSeeder::class, ApplicationCategorySeeder::class]);
     createAdminOfficer($department);
 
     seedUnrealisticDemoData($department);
@@ -72,7 +74,7 @@ test('demo:refresh rewrites demo students and applications without touching the 
     $protectedStudent = Student::query()->create([
         'user_id' => $protectedUser->id,
         'registration_no' => 'SU92-BSSEM-F22-171',
-        'program' => 'BS Software Engineering',
+        'program_id' => Program::query()->where('code', 'BSSE')->value('id'),
         'current_semester' => 8,
         'batch' => 'F22',
     ]);
@@ -118,7 +120,7 @@ test('demo:refresh rewrites demo students and applications without touching the 
 
 test('DemoSeeder creates 10 realistic students with 23 applications in total', function () {
     $department = Department::factory()->create(['code' => 'SE']);
-    $this->seed(ApplicationCategorySeeder::class);
+    $this->seed([ProgramSeeder::class, ApplicationCategorySeeder::class]);
     createAdminOfficer($department);
 
     $this->seed(DemoSeeder::class);
@@ -138,7 +140,7 @@ test('DemoSeeder creates 10 realistic students with 23 applications in total', f
 
 test('DemoSeeder creates message threads and three announcements covering every status', function () {
     $department = Department::factory()->create(['code' => 'SE']);
-    $this->seed(ApplicationCategorySeeder::class);
+    $this->seed([ProgramSeeder::class, ApplicationCategorySeeder::class]);
     createAdminOfficer($department);
 
     $this->seed(DemoSeeder::class);

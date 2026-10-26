@@ -13,6 +13,7 @@ use App\Models\ApplicationCategory;
 use App\Models\ApplicationEvent;
 use App\Models\ApplicationMessage;
 use App\Models\Department;
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -66,7 +67,7 @@ class DemoSeeder extends Seeder
             $student = Student::query()->create([
                 'user_id' => $user->id,
                 'registration_no' => $registrationNo,
-                'program' => config('students.programs')[$def['program_code']],
+                'program_id' => Program::query()->where('code', $def['program_code'])->value('id'),
                 'current_semester' => $def['current_semester'],
                 'batch' => $def['batch'],
             ]);

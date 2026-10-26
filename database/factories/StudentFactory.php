@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -25,7 +26,7 @@ class StudentFactory extends Factory
                 fake()->unique()->numberBetween(20, 25),
                 fake()->unique()->numberBetween(100, 999),
             ),
-            'program' => 'BS Software Engineering',
+            'program_id' => Program::factory(),
             'current_semester' => fake()->numberBetween(1, 8),
             'batch' => 'F'.fake()->numberBetween(20, 25),
         ];

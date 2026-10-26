@@ -23,7 +23,7 @@
                 <flux:avatar size="lg" :name="auth()->user()->name" :initials="auth()->user()->initials()" class="bg-avatar! text-plum-link!" />
                 <div class="flex flex-col gap-0.5">
                     <span class="text-[17px] font-bold text-ink">{{ auth()->user()->name }}</span>
-                    <span class="text-sm text-muted">{{ auth()->user()->student?->program ?? 'BS Software Engineering' }}</span>
+                    <span class="text-sm text-muted">{{ auth()->user()->student?->program?->name }}</span>
                 </div>
             </div>
 

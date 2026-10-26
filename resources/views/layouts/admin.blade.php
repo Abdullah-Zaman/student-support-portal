@@ -70,6 +70,36 @@
                     >
                         {{ __('Categories') }}
                     </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="building-library"
+                        :href="Route::has('super-admin.faculties.index') ? route('super-admin.faculties.index') : '#'"
+                        :current="request()->routeIs('super-admin.faculties.*')"
+                        wire:navigate
+                        :class="$navItemClass"
+                    >
+                        {{ __('Faculties') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="building-office"
+                        :href="Route::has('super-admin.departments.index') ? route('super-admin.departments.index') : '#'"
+                        :current="request()->routeIs('super-admin.departments.*')"
+                        wire:navigate
+                        :class="$navItemClass"
+                    >
+                        {{ __('Departments') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="academic-cap"
+                        :href="Route::has('super-admin.programs.index') ? route('super-admin.programs.index') : '#'"
+                        :current="request()->routeIs('super-admin.programs.*')"
+                        wire:navigate
+                        :class="$navItemClass"
+                    >
+                        {{ __('Programs') }}
+                    </flux:sidebar.item>
                 @endif
 
                 <flux:sidebar.item

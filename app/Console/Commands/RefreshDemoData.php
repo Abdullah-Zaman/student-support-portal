@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationCategory;
 use App\Models\ApplicationEvent;
 use App\Models\ApplicationMessage;
+use App\Models\Program;
 use App\Models\Student;
 use App\Models\User;
 use Database\Seeders\DemoSeeder;
@@ -74,7 +75,7 @@ class RefreshDemoData extends Command
 
             $student->update([
                 'registration_no' => $registrationNo,
-                'program' => config('students.programs')[$def['program_code']],
+                'program_id' => Program::query()->where('code', $def['program_code'])->value('id'),
                 'current_semester' => $def['current_semester'],
                 'batch' => $def['batch'],
             ]);

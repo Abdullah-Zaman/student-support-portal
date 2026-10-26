@@ -5,7 +5,9 @@ namespace App\Livewire\Admin\Students;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Models\Application;
+use App\Models\Program;
 use App\Models\Student;
+use App\Support\RegistrationNumber;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -22,7 +24,7 @@ class Show extends Component
 
     public string $name = '';
 
-    public string $program = '';
+    public string $program_id = '';
 
     public int $current_semester = 1;
 
@@ -32,9 +34,9 @@ class Show extends Component
     {
         $this->authorize('view', $student);
 
-        $this->student = $student->load('user');
+        $this->student = $student->load(['user', 'program']);
         $this->name = $student->user->name;
-        $this->program = (string) array_search($student->program, config('students.programs'), true);
+        $this->program_id = (string) $student->program_id;
         $this->current_semester = $student->current_semester;
         $this->batch = $student->batch;
     }
@@ -46,12 +48,18 @@ class Show extends Component
     }
 
     /**
-     * @return array<string, string>
+     * Every program of the student's department, inactive ones included,
+     * since an existing student may belong to a since-deactivated program.
+     *
+     * @return Collection<int, Program>
      */
     #[Computed]
-    public function programs(): array
+    public function programs(): Collection
     {
-        return config('students.programs');
+        return Program::query()
+            ->where('department_id', $this->student->user->department_id)
+            ->orderBy('name')
+            ->get();
     }
 
     /**
@@ -95,23 +103,25 @@ class Show extends Component
     {
         $this->authorize('updateProfile', $this->student);
 
+        $programs = $this->programs();
+
         $validated = $this->validate([
-            'program' => ['required', 'string', Rule::in(array_keys(config('students.programs')))],
+            'program_id' => ['required', 'integer', Rule::in($programs->modelKeys())],
             'current_semester' => ['required', 'integer', 'between:1,8'],
             'batch' => ['required', 'string', 'max:20'],
         ]);
 
-        $pattern = config('students.registration_no_pattern');
-        preg_match($pattern, $this->student->registration_no, $matches);
+        $program = $programs->firstWhere('id', (int) $validated['program_id']);
+        $parsed = RegistrationNumber::parse($this->student->registration_no, openProgramsOnly: false);
 
-        if (($matches[1] ?? null) !== $validated['program']) {
-            $this->addError('program', __("This doesn't match the student's registration number."));
+        if (($parsed['program_code'] ?? null) !== $program?->code) {
+            $this->addError('program_id', __("This doesn't match the student's registration number."));
 
             return;
         }
 
         $this->student->update([
-            'program' => config('students.programs')[$validated['program']],
+            'program_id' => $program->id,
             'current_semester' => $validated['current_semester'],
             'batch' => $validated['batch'],
         ]);

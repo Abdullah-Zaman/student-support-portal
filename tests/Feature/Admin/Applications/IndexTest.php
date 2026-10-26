@@ -8,6 +8,7 @@ use App\Models\Application;
 use App\Models\ApplicationCategory;
 use App\Models\ApplicationMessage;
 use App\Models\Department;
+use App\Models\Program;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -134,6 +135,45 @@ test('the status filter can be reset back to showing everything', function () {
         ->assertSee('Resolved one');
 });
 
+test('applications can be filtered by the student\'s roll number, batch and program', function (string $filter, string $value) {
+    $department = Department::factory()->create();
+    $bsse = Program::factory()->create(['department_id' => $department->id, 'code' => 'BSSE']);
+    $bsds = Program::factory()->create(['department_id' => $department->id, 'code' => 'BSDS']);
+    $admin = createAdminOfficer($department);
+
+    $matching = createStudentUser($department);
+    $matching->student->update(['registration_no' => 'SU92-BSSEM-F22-171', 'batch' => 'F22', 'program_id' => $bsse->id]);
+    createApplicationInDepartment($department, $matching)->update(['subject' => 'Matching student application']);
+
+    $other = createStudentUser($department);
+    $other->student->update(['registration_no' => 'SU92-BSDSM-F23-045', 'batch' => 'F23', 'program_id' => $bsds->id]);
+    createApplicationInDepartment($department, $other)->update(['subject' => 'Other student application']);
+
+    $value = $filter === 'program_id' ? (string) $bsse->id : $value;
+
+    Livewire::actingAs($admin)
+        ->test(Index::class)
+        ->set($filter, $value)
+        ->assertSee('Matching student application')
+        ->assertDontSee('Other student application');
+})->with([
+    'partial roll number' => ['roll_no', 'F22-171'],
+    'batch' => ['batch', 'F22'],
+    'program' => ['program_id', ''],
+]);
+
+test('the program filter only offers the admin officer\'s own department programs', function () {
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    Program::factory()->create(['department_id' => $department->id, 'name' => 'BS Own Program']);
+    Program::factory()->create(['name' => 'BS Foreign Program']);
+
+    Livewire::actingAs($admin)
+        ->test(Index::class)
+        ->assertSee('BS Own Program')
+        ->assertDontSee('BS Foreign Program');
+});
+
 test('clearFilters resets search, every dropdown and the date range', function () {
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
@@ -146,12 +186,19 @@ test('clearFilters resets search, every dropdown and the date range', function (
         ->set('category_id', '1')
         ->set('semester', '3')
         ->set('date_from', '2026-01-01')
-        ->set('date_to', '2026-01-31');
+        ->set('date_to', '2026-01-31')
+        ->set('roll_no', 'F22-171')
+        ->set('batch', 'F22')
+        ->set('program_id', '1');
 
     expect($component->get('hasActiveFilters'))->toBeTrue();
 
     $component->call('clearFilters');
 
+    expect($component->get('hasActiveFilters'))->toBeFalse();
+    expect($component->get('roll_no'))->toBe('');
+    expect($component->get('batch'))->toBe('');
+    expect($component->get('program_id'))->toBe('');
     expect($component->get('search'))->toBe('');
     expect($component->get('status'))->toBe('');
     expect($component->get('priority'))->toBe('');

@@ -28,7 +28,7 @@
                     </div>
                     <div class="flex flex-col gap-1">
                         <dt class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Program') }}</dt>
-                        <dd class="m-0 text-[15px] font-semibold">{{ $application->student->program }}</dd>
+                        <dd class="m-0 text-[15px] font-semibold">{{ $application->student->program->name }}</dd>
                     </div>
                     <div class="flex flex-col gap-1">
                         <dt class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Batch') }}</dt>

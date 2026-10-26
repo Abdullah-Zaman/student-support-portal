@@ -4,6 +4,7 @@ namespace App\Concerns;
 
 use App\Models\Student;
 use App\Models\User;
+use App\Support\RegistrationNumber;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,7 @@ trait RegistrationValidationRules
      */
     protected function programRules(): array
     {
-        return ['required', 'string', Rule::in(array_keys(config('students.programs')))];
+        return ['required', 'string', Rule::in(RegistrationNumber::openProgramCodes())];
     }
 
     /**
@@ -49,15 +50,17 @@ trait RegistrationValidationRules
             'required',
             'string',
             function (string $attribute, mixed $value, Closure $fail) use ($program) {
-                $pattern = config('students.registration_no_pattern');
+                $parsed = RegistrationNumber::parse((string) $value);
 
-                if (! preg_match($pattern, strtoupper((string) $value), $matches)) {
-                    $fail(__('Invalid registration number format.'));
+                if ($parsed === null) {
+                    $fail(RegistrationNumber::parse((string) $value, openProgramsOnly: false) === null
+                        ? __('Invalid registration number format.')
+                        : __('Registration is not open for this program.'));
 
                     return;
                 }
 
-                if ($program && $matches[1] !== $program) {
+                if ($program && $parsed['program_code'] !== $program) {
                     $fail(__("This registration number doesn't match the selected program."));
                 }
             },

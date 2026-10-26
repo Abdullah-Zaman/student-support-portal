@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\ScopedToAdminDepartmentViaUser;
+use App\Models\Scopes\AdminDepartmentScope;
 use Database\Factories\StudentFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,7 +21,7 @@ class Student extends Model
     protected $fillable = [
         'user_id',
         'registration_no',
-        'program',
+        'program_id',
         'current_semester',
         'batch',
     ];
@@ -28,7 +29,7 @@ class Student extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['program', 'current_semester', 'batch'])
+            ->logOnly(['program_id', 'current_semester', 'batch'])
             ->logOnlyDirty();
     }
 
@@ -40,16 +41,34 @@ class Student extends Model
     protected function batchLabel(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                if (! preg_match('/^([FS])(\d{2})$/', (string) $this->batch, $matches)) {
-                    return $this->batch;
-                }
-
-                $term = $matches[1] === 'F' ? 'Fall' : 'Spring';
-
-                return "{$term} 20{$matches[2]}";
-            },
+            get: fn () => self::labelForBatch((string) $this->batch),
         );
+    }
+
+    /**
+     * "F22" becomes "Fall 2022", "S23" becomes "Spring 2023". Anything
+     * else is returned unchanged.
+     */
+    public static function labelForBatch(string $batch): string
+    {
+        if (! preg_match('/^([FS])(\d{2})$/', $batch, $matches)) {
+            return $batch;
+        }
+
+        $term = $matches[1] === 'F' ? 'Fall' : 'Spring';
+
+        return "{$term} 20{$matches[2]}";
+    }
+
+    /**
+     * Unscoped: anyone allowed to see the student may see their program,
+     * even if a Super Admin has since moved it to another department.
+     *
+     * @return BelongsTo<Program, $this>
+     */
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(Program::class)->withoutGlobalScope(AdminDepartmentScope::class);
     }
 
     /**

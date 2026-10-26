@@ -17,7 +17,7 @@
                 <dl class="m-0 flex flex-wrap gap-x-10 gap-y-4">
                     <div class="flex flex-col gap-1">
                         <dt class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Program') }}</dt>
-                        <dd class="m-0 text-[15px] font-semibold">{{ $student->program }}</dd>
+                        <dd class="m-0 text-[15px] font-semibold">{{ $student->program->name }}</dd>
                     </div>
                     <div class="flex flex-col gap-1">
                         <dt class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Batch') }}</dt>
@@ -64,9 +64,9 @@
             @if ($this->isSuperAdmin)
                 <x-panel :title="__('Edit profile')">
                     <div class="flex flex-col gap-3 px-[22px] py-4">
-                        <flux:select wire:model="program" :label="__('Program')">
-                            @foreach ($this->programs as $code => $label)
-                                <flux:select.option :value="$code">{{ $label }}</flux:select.option>
+                        <flux:select wire:model="program_id" :label="__('Program')">
+                            @foreach ($this->programs as $programOption)
+                                <flux:select.option :value="(string) $programOption->id" wire:key="program-{{ $programOption->id }}">{{ $programOption->name }}</flux:select.option>
                             @endforeach
                         </flux:select>
                         <flux:select wire:model="current_semester" :label="__('Current semester')">

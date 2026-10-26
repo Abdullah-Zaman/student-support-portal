@@ -1,12 +1,11 @@
 <?php
 
 use App\Livewire\Auth\Register;
-use App\Models\Department;
 use Livewire\Livewire;
 
 beforeEach(function () {
     createRoles();
-    Department::factory()->create(['code' => 'SE']);
+    seedAcademicStructure();
 });
 
 test('registration number is uppercased as it is typed', function () {

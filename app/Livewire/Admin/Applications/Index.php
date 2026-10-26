@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Applications;
 
+use App\Concerns\FiltersByStudentProfile;
 use App\Enums\ApplicationPriority;
 use App\Enums\ApplicationStatus;
 use App\Enums\RoleName;
@@ -23,7 +24,7 @@ use Livewire\WithPagination;
 #[Title('Applications')]
 class Index extends Component
 {
-    use WithPagination;
+    use FiltersByStudentProfile, WithPagination;
 
     #[Url]
     public string $search = '';
@@ -62,7 +63,7 @@ class Index extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id'], true)) {
+        if (in_array($property, ['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id', ...$this->studentProfileFilterProperties()], true)) {
             $this->resetPage();
         }
     }
@@ -79,7 +80,7 @@ class Index extends Component
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id']);
+        $this->reset(['search', 'status', 'priority', 'category_id', 'semester', 'date_from', 'date_to', 'department_id', ...$this->studentProfileFilterProperties()]);
         $this->resetPage();
     }
 
@@ -93,7 +94,8 @@ class Index extends Component
             || $this->semester !== ''
             || $this->date_from !== ''
             || $this->date_to !== ''
-            || $this->department_id !== '';
+            || $this->department_id !== ''
+            || $this->hasStudentProfileFilters();
     }
 
     #[Computed]
@@ -128,6 +130,7 @@ class Index extends Component
                         ->orWhereHas('student', fn (Builder $q) => $q->where('registration_no', 'like', '%'.$this->search.'%'));
                 });
             })
+            ->when($this->hasStudentProfileFilters(), fn (Builder $query) => $query->whereHas('student', fn (Builder $query) => $this->applyStudentProfileFilters($query)))
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->priority !== '', fn (Builder $query) => $query->where('priority', $this->priority))
             ->when($this->category_id !== '', fn (Builder $query) => $query->where('category_id', $this->category_id))

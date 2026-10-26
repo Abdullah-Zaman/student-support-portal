@@ -60,6 +60,8 @@
         </div>
 
         <div class="flex flex-wrap items-end gap-4">
+            <x-student-profile-filters :programs="$this->programs" :batches="$this->batches" />
+
             <div class="flex min-w-0 flex-1 basis-40 flex-col gap-1">
                 <flux:input type="date" wire:model.live="date_from" :label="__('From')" />
             </div>

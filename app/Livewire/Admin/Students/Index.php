@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Students;
 
+use App\Concerns\FiltersByStudentProfile;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Models\Department;
@@ -21,13 +22,10 @@ use Livewire\WithPagination;
 #[Title('Students')]
 class Index extends Component
 {
-    use WithPagination;
+    use FiltersByStudentProfile, WithPagination;
 
     #[Url]
     public string $search = '';
-
-    #[Url]
-    public string $program = '';
 
     #[Url]
     public string $semester = '';
@@ -45,14 +43,14 @@ class Index extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['search', 'program', 'semester', 'status', 'department_id'], true)) {
+        if (in_array($property, ['search', 'semester', 'status', 'department_id', ...$this->studentProfileFilterProperties()], true)) {
             $this->resetPage();
         }
     }
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'program', 'semester', 'status', 'department_id']);
+        $this->reset(['search', 'semester', 'status', 'department_id', ...$this->studentProfileFilterProperties()]);
         $this->resetPage();
     }
 
@@ -60,7 +58,7 @@ class Index extends Component
     public function hasActiveFilters(): bool
     {
         return $this->search !== ''
-            || $this->program !== ''
+            || $this->hasStudentProfileFilters()
             || $this->semester !== ''
             || $this->status !== ''
             || $this->department_id !== '';
@@ -88,7 +86,7 @@ class Index extends Component
     public function students(): LengthAwarePaginator
     {
         return Student::query()
-            ->with('user.department')
+            ->with(['user.department', 'program'])
             ->when($this->search !== '', function (Builder $query) {
                 $query->where(function (Builder $query) {
                     $query->where('registration_no', 'like', '%'.$this->search.'%')
@@ -98,26 +96,12 @@ class Index extends Component
                         });
                 });
             })
-            ->when($this->program !== '', fn (Builder $query) => $query->where('program', $this->program))
+            ->tap(fn (Builder $query) => $this->applyStudentProfileFilters($query))
             ->when($this->semester !== '', fn (Builder $query) => $query->where('current_semester', $this->semester))
             ->when($this->status !== '', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('status', $this->status)))
             ->when($this->isSuperAdmin() && $this->department_id !== '', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('department_id', $this->department_id)))
             ->orderBy('registration_no')
             ->paginate(15);
-    }
-
-    /**
-     * Keyed by the program's full label, since that's what's actually
-     * stored on students.program (see CreateNewUser), not the short code.
-     *
-     * @return array<string, string>
-     */
-    #[Computed]
-    public function programs(): array
-    {
-        $labels = array_values(config('students.programs'));
-
-        return array_combine($labels, $labels);
     }
 
     /**

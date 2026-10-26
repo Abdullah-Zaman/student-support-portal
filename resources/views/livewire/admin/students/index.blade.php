@@ -21,14 +21,7 @@
             </div>
         @endif
 
-        <div class="flex min-w-0 flex-1 basis-48 flex-col gap-1">
-            <flux:select wire:model.live="program" :label="__('Program')">
-                <flux:select.option value="">{{ __('All programs') }}</flux:select.option>
-                @foreach ($this->programs as $value => $label)
-                    <flux:select.option :value="$value">{{ $label }}</flux:select.option>
-                @endforeach
-            </flux:select>
-        </div>
+        <x-student-profile-filters :programs="$this->programs" :batches="$this->batches" />
 
         <div class="flex min-w-0 flex-1 basis-32 flex-col gap-1">
             <flux:select wire:model.live="semester" :label="__('Semester')">
@@ -83,7 +76,7 @@
                                 @if ($this->isSuperAdmin)
                                     <td class="px-3 py-3.5 text-ink-soft">{{ $student->user->department?->name }}</td>
                                 @endif
-                                <td class="px-3 py-3.5 text-ink-soft">{{ $student->program }}</td>
+                                <td class="px-3 py-3.5 text-ink-soft">{{ $student->program->name }}</td>
                                 <td class="px-3 py-3.5 tabular-nums text-ink-soft">{{ $student->current_semester }}</td>
                                 <td class="px-3 py-3.5">
                                     <flux:badge :color="$student->user->status->value === 'active' ? 'green' : ($student->user->status->value === 'suspended' ? 'red' : 'zinc')" size="sm">
