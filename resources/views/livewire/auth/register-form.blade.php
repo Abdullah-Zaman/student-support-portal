@@ -1,5 +1,10 @@
 <div class="flex flex-col gap-6">
-    <x-auth-header :title="__('Create an account')" :description="__('Only students of the Software Engineering Department (BS SE, BS DS, BS AI) with a university email can register.')" />
+    <x-auth-header
+        :title="__('Create an account')"
+        :description="$this->programs->isEmpty()
+            ? __('Registration is not open for any program right now.')
+            : __('Only students of :programs with a university email can register.', ['programs' => $this->programs->pluck('code')->join(', ', ' and ')])"
+    />
 
     <form wire:submit="register" class="flex flex-col gap-6">
         <!-- Name -->

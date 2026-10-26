@@ -1,7 +1,11 @@
 <?php
 
 use App\Enums\RoleName;
+use App\Models\Department;
+use App\Models\TimetableVersion;
 use App\Models\User;
+use Illuminate\Routing\Route as IlluminateRoute;
+use Illuminate\Support\Facades\Route;
 
 beforeEach(function () {
     createRoles();
@@ -119,5 +123,26 @@ test('an admin officer and a student cannot reach any super admin only route', f
     foreach ($superAdminOnlyRoutes as $url) {
         $this->actingAs($admin)->get($url)->assertForbidden();
         $this->actingAs($student)->get($url)->assertForbidden();
+    }
+});
+
+test('an admin officer gets 403 on every super admin page, including ones in their own department', function () {
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    $student = createStudentUser($department);
+    $parameters = [
+        'student' => $student->student->id,
+        'application' => createApplicationInDepartment($department, $student)->id,
+        'version' => TimetableVersion::factory()->create(['department_id' => $department->id])->id,
+    ];
+
+    $superAdminPages = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn (IlluminateRoute $route) => str_starts_with((string) $route->getName(), 'super-admin.') && in_array('GET', $route->methods(), true))
+        ->map(fn (IlluminateRoute $route) => route($route->getName(), array_intersect_key($parameters, array_flip($route->parameterNames()))));
+
+    expect($superAdminPages)->not->toBeEmpty();
+
+    foreach ($superAdminPages as $url) {
+        $this->actingAs($admin)->get($url)->assertForbidden();
     }
 });

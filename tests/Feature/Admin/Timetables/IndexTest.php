@@ -28,7 +28,7 @@ test('an admin officer uploads a timetable as a draft version of their own depar
     $component = Livewire::actingAs($admin)
         ->test(Index::class)
         ->set('file', timetableUpload())
-        ->call('upload')
+        ->call('uploadTimetable')
         ->assertHasNoErrors();
 
     $version = TimetableVersion::query()->sole();
@@ -53,7 +53,7 @@ test('a second upload in the same department gets the next version number', func
     Livewire::actingAs($admin)
         ->test(Index::class)
         ->set('file', timetableUpload())
-        ->call('upload')
+        ->call('uploadTimetable')
         ->assertHasNoErrors();
 
     expect(TimetableVersion::query()->max('version_no'))->toBe(5);
@@ -65,7 +65,7 @@ test('a file that is not an xlsx workbook is rejected', function () {
     Livewire::actingAs($admin)
         ->test(Index::class)
         ->set('file', UploadedFile::fake()->create('timetable.pdf', 50, 'application/pdf'))
-        ->call('upload')
+        ->call('uploadTimetable')
         ->assertHasErrors(['file']);
 
     expect(TimetableVersion::query()->count())->toBe(0);
@@ -75,7 +75,7 @@ test('a super admin must choose the department to upload for', function () {
     Livewire::actingAs(createSuperAdmin())
         ->test(Index::class)
         ->set('file', timetableUpload())
-        ->call('upload')
+        ->call('uploadTimetable')
         ->assertHasErrors(['department_id' => 'required']);
 });
 
@@ -86,7 +86,7 @@ test('a super admin can upload a timetable for any department', function () {
         ->test(Index::class)
         ->set('department_id', (string) $department->id)
         ->set('file', timetableUpload())
-        ->call('upload')
+        ->call('uploadTimetable')
         ->assertHasNoErrors();
 
     expect(TimetableVersion::query()->sole()->department_id)->toBe($department->id);

@@ -2,7 +2,15 @@
     <x-page-header :title="__('Timetable')" :subtitle="__('Upload the department timetable (.xlsx), check the preview, then publish it to students.')" />
 
     <x-card>
-        <form wire:submit="upload" class="flex flex-wrap items-end gap-4">
+        <form
+            wire:submit="uploadTimetable"
+            class="flex flex-wrap items-end gap-4"
+            x-data="{ uploading: false, uploadFailed: false }"
+            x-on:livewire-upload-start="uploading = true; uploadFailed = false"
+            x-on:livewire-upload-finish="uploading = false"
+            x-on:livewire-upload-cancel="uploading = false"
+            x-on:livewire-upload-error="uploading = false; uploadFailed = true"
+        >
             @if ($this->isSuperAdmin)
                 <div class="flex min-w-0 flex-1 basis-56 flex-col gap-1">
                     <flux:select wire:model.live="department_id" :label="__('Department')">
@@ -17,11 +25,15 @@
             <div class="flex min-w-0 flex-[2_1_20rem] flex-col gap-1">
                 <flux:input type="file" wire:model="file" :label="__('Timetable file')" accept=".xlsx" />
                 <flux:description>{{ __('Excel .xlsx with the weekday and weekend sheets. Up to 10 MB.') }}</flux:description>
+                <p x-show="uploadFailed" x-cloak class="m-0 text-sm text-red-600" role="alert" data-test="timetable-upload-failed">
+                    {{ __('The file could not be uploaded. Check that it is an .xlsx file under 10 MB and try again.') }}
+                </p>
             </div>
 
-            <flux:button type="submit" variant="primary" icon="arrow-up-tray" wire:loading.attr="disabled" wire:target="file,upload">
-                <span wire:loading.remove wire:target="upload">{{ __('Upload and preview') }}</span>
-                <span wire:loading wire:target="upload">{{ __('Reading file…') }}</span>
+            <flux:button type="submit" variant="primary" icon="arrow-up-tray" wire:loading.attr="disabled" wire:target="file,uploadTimetable" x-bind:disabled="uploading">
+                <span wire:loading.remove wire:target="file,uploadTimetable">{{ __('Upload and preview') }}</span>
+                <span wire:loading wire:target="file">{{ __('Uploading…') }}</span>
+                <span wire:loading wire:target="uploadTimetable">{{ __('Reading file…') }}</span>
             </flux:button>
         </form>
     </x-card>

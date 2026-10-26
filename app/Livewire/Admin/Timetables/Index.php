@@ -73,7 +73,11 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function upload(ImportTimetable $importTimetable): void
+    /**
+     * Not named "upload": in the browser, $wire.upload is Livewire's own
+     * file-upload helper, so wire:submit="upload" never reaches PHP.
+     */
+    public function uploadTimetable(ImportTimetable $importTimetable): void
     {
         $this->authorize('create', TimetableVersion::class);
 

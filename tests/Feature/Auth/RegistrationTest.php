@@ -224,3 +224,12 @@ test('registration is rate limited to 20 attempts per minute per ip', function (
 
     $response->assertStatus(429);
 });
+
+test('the registration intro lists the programs open for registration from the database', function () {
+    Program::query()->where('code', 'BSDS')->firstOrFail()->update(['is_active' => false]);
+    Program::factory()->create(['code' => 'BSIT', 'name' => 'BS Information Technology', 'department_id' => Department::query()->where('code', 'SE')->value('id')]);
+
+    Livewire::test(Register::class)
+        ->assertSee('Only students of BSAI, BSIT and BSSE with a university email can register.')
+        ->assertDontSee('BS SE, BS DS, BS AI');
+});
