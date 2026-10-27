@@ -206,3 +206,19 @@ test('a super admin can filter applications across departments by program', func
         ->assertSee('Department B application')
         ->assertDontSee('Department A application');
 });
+
+test('the rename migration renames the seeded faculty in place and leaves a custom name alone', function () {
+    $seeded = Faculty::factory()->create(['code' => 'FOC', 'name' => 'Faculty of Computing']);
+    $department = Department::factory()->create(['faculty_id' => $seeded->id]);
+    $dean = createDean($seeded);
+    $dean->update(['name' => 'Dean, Faculty of Computing']);
+    $other = Faculty::factory()->create(['name' => 'Faculty of Computing Studies']);
+
+    (require database_path('migrations/2026_10_27_173108_rename_faculty_of_computing_to_faculty_of_cs_and_it.php'))->up();
+
+    expect($seeded->refresh()->name)->toBe('Faculty of CS & IT')
+        ->and($department->refresh()->faculty_id)->toBe($seeded->id)
+        ->and($dean->refresh()->faculty_id)->toBe($seeded->id)
+        ->and($dean->name)->toBe('Dean, Faculty of CS & IT')
+        ->and($other->refresh()->name)->toBe('Faculty of Computing Studies');
+});

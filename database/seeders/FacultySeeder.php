@@ -11,7 +11,7 @@ class FacultySeeder extends Seeder
     {
         Faculty::query()->firstOrCreate(
             ['code' => 'FOC'],
-            ['name' => 'Faculty of Computing', 'is_active' => true],
+            ['name' => 'Faculty of CS & IT', 'is_active' => true],
         );
     }
 }

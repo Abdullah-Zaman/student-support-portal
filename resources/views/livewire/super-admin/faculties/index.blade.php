@@ -61,7 +61,7 @@
         <div class="flex flex-col gap-5">
             <flux:heading size="lg">{{ $editing_id ? __('Edit faculty') : __('New faculty') }}</flux:heading>
 
-            <flux:input wire:model="name" :label="__('Name')" maxlength="100" :placeholder="__('Faculty of Computing')" />
+            <flux:input wire:model="name" :label="__('Name')" maxlength="100" :placeholder="__('Faculty of CS & IT')" />
             <flux:input wire:model="code" :label="__('Code')" maxlength="20" placeholder="FOC" class="uppercase" />
             <flux:checkbox wire:model="is_active" :label="__('Active')" />
 

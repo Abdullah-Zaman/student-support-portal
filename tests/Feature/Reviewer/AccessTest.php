@@ -40,7 +40,7 @@ test('HOD and Dean land on their own dashboard after login', function (string $r
     $this->actingAs($user)->get(route($role.'.dashboard'))->assertOk();
 })->with(['hod', 'dean']);
 
-test('the seeded HOD and Dean belong to the SE department and the Faculty of Computing', function () {
+test('the seeded HOD and Dean belong to the SE department and the Faculty of CS & IT', function () {
     seedAcademicStructure();
     $this->seed(ReviewerUserSeeder::class);
 

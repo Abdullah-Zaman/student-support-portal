@@ -82,7 +82,7 @@ function createRoles(): void
 }
 
 /**
- * The seeded academic structure: Faculty of Computing, the SE/IT/CS
+ * The seeded academic structure: Faculty of CS & IT, the SE/IT/CS
  * departments and the BSSE/BSDS/BSAI programs under SE.
  */
 function seedAcademicStructure(): void

@@ -11,7 +11,7 @@ use Illuminate\Database\Seeder;
 use RuntimeException;
 
 /**
- * The SE department's HOD and the Faculty of Computing's Dean. Only
+ * The SE department's HOD and the Faculty of CS & IT's Dean. Only
  * creates them when missing: an existing account (and its password) is
  * never overwritten.
  */
@@ -39,7 +39,7 @@ class ReviewerUserSeeder extends Seeder
         $dean = User::query()->firstOrCreate(
             ['email' => config('seeding.dean.email')],
             [
-                'name' => 'Dean, Faculty of Computing',
+                'name' => 'Dean, Faculty of CS & IT',
                 'password' => config('seeding.dean.password'),
                 'faculty_id' => $faculty->id,
                 'status' => UserStatus::Active,
