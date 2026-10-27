@@ -19,8 +19,8 @@ test('a student sees where their application was forwarded but never the note or
     $student = createStudentUser($department);
     $application = createApplicationInDepartment($department, $student);
 
-    app(ForwardApplication::class)->handle($application, $admin, ForwardTarget::Hod, 'Confidential forward note for the HOD');
-    app(AddRemark::class)->handle($application, $hod, RemarkType::NotRecommended, 'Confidential HOD remark text');
+    app(ForwardApplication::class)->handle($application, $admin, ForwardTarget::Hod, 'Confidential forward note for the HOD', 'forward-key');
+    app(AddRemark::class)->handle($application, $hod, RemarkType::NotRecommended, 'Confidential HOD remark text', 'remark-key');
 
     $this->actingAs($student)
         ->get(route('student.applications.show', $application))
@@ -40,11 +40,11 @@ test('a student sees where their application was forwarded but never the note or
         ->not->toContain('Confidential');
 });
 
-test('a student is never allowed to view the forward chain', function () {
+test('a student is never allowed to view the correspondence', function () {
     $department = Department::factory()->create();
     $student = createStudentUser($department);
     $application = createApplicationInDepartment($department, $student);
 
-    expect($student->can('viewForwardChain', $application))->toBeFalse()
+    expect($student->can('viewCorrespondence', $application))->toBeFalse()
         ->and($student->can('remark', $application))->toBeFalse();
 });

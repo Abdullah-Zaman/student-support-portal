@@ -2,23 +2,12 @@
     Forward an application. The Livewire component provides forward_target,
     forward_note and a forward() action. $options maps each target this user
     may forward to onto the reason it is unavailable right now (or null).
-    $gmailRequiredMessage is set when the user must (re)connect Gmail first.
 --}}
 @props([
     'options',
-    'gmailRequiredMessage' => null,
 ])
 
 <div class="flex flex-col gap-3 px-[22px] py-4">
-    @if ($gmailRequiredMessage)
-        <div class="flex flex-col gap-2.5 rounded-[10px] bg-[#FFF1D6] px-3.5 py-3 text-[13px] text-[#7A4A00]" data-test="forward-gmail-required">
-            <p class="m-0 flex items-start gap-2">
-                <flux:icon icon="envelope" variant="micro" class="mt-0.5 size-4 shrink-0" />
-                {{ $gmailRequiredMessage }}
-            </p>
-            <flux:button size="sm" :href="route('profile.edit')" icon="link" class="self-start" wire:navigate>{{ __('Go to Connected Gmail') }}</flux:button>
-        </div>
-    @else
     @foreach ($options as $value => $reason)
         @if ($reason)
             <p class="m-0 flex items-start gap-2 rounded-[10px] bg-[#FFF1D6] px-3 py-2.5 text-[13px] text-[#7A4A00]" data-test="forward-unavailable-{{ $value }}">
@@ -51,9 +40,8 @@
             confirmAction="forward"
         >
             <x-slot:trigger>
-                <flux:button variant="primary" icon="arrow-uturn-right" class="w-full">{{ __('Forward') }}</flux:button>
+                <flux:button variant="primary" icon="arrow-uturn-right" class="w-full" wire:loading.attr="disabled" wire:target="forward">{{ __('Forward') }}</flux:button>
             </x-slot:trigger>
         </x-confirm-modal>
-    @endif
     @endif
 </div>

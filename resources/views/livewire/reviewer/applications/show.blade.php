@@ -78,9 +78,7 @@
                 </x-panel>
             @endif
 
-            <x-panel :title="__('Forwards & remarks')">
-                <x-forward-chain :forwards="$this->forwards" />
-            </x-panel>
+            <livewire:correspondence.thread :application="$application" />
         </div>
 
         <aside class="flex min-w-0 flex-1 basis-80 flex-col gap-6">
@@ -107,14 +105,14 @@
                                 maxlength="1000"
                             />
 
-                            <flux:button type="submit" variant="primary" class="w-full">{{ __('Save remark') }}</flux:button>
+                            <flux:button type="submit" variant="primary" class="w-full" wire:loading.attr="disabled" wire:target="addRemark">{{ __('Save remark') }}</flux:button>
                         </form>
                     </x-panel>
                 @endcan
 
                 @if ($this->forwardOptions !== [])
                     <x-panel :title="__('Forward onward')">
-                        <x-forward-form :options="$this->forwardOptions" :gmailRequiredMessage="$this->gmailRequiredMessage" />
+                        <x-forward-form :options="$this->forwardOptions" />
                     </x-panel>
                 @endif
             @endif

@@ -80,10 +80,10 @@ class Index extends Component
                 'category',
                 'student.user',
                 'student.program',
-                'forwards' => fn ($query) => $query->where('to_role', $role)->latest('id'),
-                'remarks' => fn ($query) => $query->where('author_role', $role)->latest('id'),
+                'forwards' => fn ($query) => $query->where('to_party', $role)->latest('id'),
+                'remarks' => fn ($query) => $query->where('from_party', $role)->latest('id'),
             ])
-            ->withMax(['forwards as forwarded_at' => fn (Builder $query) => $query->where('to_role', $role)], 'created_at')
+            ->withMax(['forwards as forwarded_at' => fn (Builder $query) => $query->where('to_party', $role)], 'created_at')
             ->when($this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
             ->when($this->hasStudentProfileFilters(), fn (Builder $query) => $query->whereHas('student', fn (Builder $query) => $this->applyStudentProfileFilters($query)))
             ->orderByDesc('forwarded_at')

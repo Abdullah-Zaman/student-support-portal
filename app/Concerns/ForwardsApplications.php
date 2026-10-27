@@ -3,19 +3,19 @@
 namespace App\Concerns;
 
 use App\Actions\Forwarding\ForwardApplication;
-use App\Enums\ForwardEmailStatus;
+use App\Enums\CorrespondenceEmailStatus;
 use App\Enums\ForwardTarget;
-use App\Models\ApplicationForward;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 
 /**
- * The forward form and the forward/remark chain, shared by the Admin
- * Officer's and the HOD/Dean's application views. The using component
+ * The forward form, shared by the Admin Officer's and the HOD/Dean's
+ * application views. Forwards land in the correspondence thread (the
+ * correspondence.thread component on the same page). The using component
  * must have a public Application $application property.
  */
 trait ForwardsApplications
@@ -23,6 +23,18 @@ trait ForwardsApplications
     public string $forward_target = '';
 
     public string $forward_note = '';
+
+    /**
+     * Idempotency key of the forward being written, so a double click
+     * forwards (and emails) only once.
+     */
+    #[Locked]
+    public string $forward_key = '';
+
+    public function mountForwardsApplications(): void
+    {
+        $this->forward_key = (string) Str::uuid();
+    }
 
     /**
      * Each target this user may forward to, with the reason it is
@@ -53,63 +65,6 @@ trait ForwardsApplications
         return $options;
     }
 
-    /**
-     * @return Collection<int, ApplicationForward>
-     */
-    #[Computed]
-    public function forwards(): Collection
-    {
-        $this->authorize('viewForwardChain', $this->application);
-
-        return $this->application->forwards()
-            ->with(['sender', 'recipient', 'remarks.author'])
-            ->orderBy('id')
-            ->get();
-    }
-
-    /**
-     * Forwards are emailed from the forwarder's own Gmail, so without a
-     * usable connection the form shows this instead. Null when ready.
-     */
-    #[Computed]
-    public function gmailRequiredMessage(): ?string
-    {
-        $user = Auth::user();
-
-        return $user->hasConnectedGmail() ? null : ForwardApplication::gmailRequiredMessage($user);
-    }
-
-    /**
-     * Send (or retry) the email of one of this user's own forwards on
-     * this application that is pending or failed.
-     */
-    public function sendForwardEmail(int $forwardId, ForwardApplication $forwardApplication): void
-    {
-        $forward = $this->application->forwards()->findOrFail($forwardId);
-
-        $this->authorize('sendEmail', $forward);
-
-        try {
-            $forwardApplication->resendEmail($forward);
-        } catch (ValidationException $exception) {
-            Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
-
-            return;
-        }
-
-        unset($this->forwards);
-
-        $forward->refresh();
-
-        if ($forward->email_status === ForwardEmailStatus::Sent) {
-            Flux::toast(variant: 'success', text: __('Forward email sent.'));
-        } elseif ($forward->email_status === ForwardEmailStatus::Failed) {
-            Flux::toast(variant: 'danger', text: (string) $forward->email_error);
-        } else {
-            Flux::toast(text: __('Forward email queued for sending.'));
-        }
-    }
-
     public function forward(ForwardApplication $forwardApplication): void
     {
         $validated = $this->validate([
@@ -124,15 +79,19 @@ trait ForwardsApplications
 
         $this->authorize('forward', [$this->application, $target]);
 
-        $forwardApplication->handle($this->application, Auth::user(), $target, $validated['forward_note']);
+        $forward = $forwardApplication->handle($this->application, Auth::user(), $target, $validated['forward_note'], $this->forward_key);
 
         $this->reset('forward_target', 'forward_note');
+        $this->forward_key = (string) Str::uuid();
         $this->application->refresh();
-        unset($this->forwards, $this->forwardOptions);
+        unset($this->forwardOptions);
         $this->afterForwarding();
+        $this->dispatch('correspondence-posted');
 
         $this->modal('confirm-forward')->close();
-        Flux::toast(variant: 'success', text: __('Application forwarded to the :target.', ['target' => $target->label()]));
+        Flux::toast(variant: 'success', text: $forward->email_status === CorrespondenceEmailStatus::AwaitingGmail
+            ? __('Application forwarded to the :target. It will be emailed once you connect your Gmail.', ['target' => $target->label()])
+            : __('Application forwarded to the :target.', ['target' => $target->label()]));
     }
 
     /**

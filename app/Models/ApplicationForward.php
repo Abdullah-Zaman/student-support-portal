@@ -13,8 +13,9 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
- * One step of an application's forwarding chain, e.g. Admin Officer →
- * HOD. Staff-only: never loaded in any student view.
+ * Legacy: one step of an application's old forwarding chain. Copied into
+ * correspondence_messages and kept read-only (old audit-log entries point
+ * here) until the table is dropped. Write correspondence instead.
  *
  * @property int $application_id
  * @property int $from_user_id

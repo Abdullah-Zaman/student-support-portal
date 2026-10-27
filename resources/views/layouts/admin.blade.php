@@ -10,6 +10,7 @@
         default => 'admin.',
     };
     $dashboardRoute = $routePrefix.'dashboard';
+    $inboxUnreadCount = ! $isSuperAdmin && auth()->user() ? app(\App\Support\Correspondence\CorrespondenceInbox::class)->unreadCount(auth()->user()) : 0;
     $navItemClass = 'text-white/85! data-current:border-transparent! data-current:bg-white/14! data-current:text-white! hover:text-white! hover:bg-white/8!';
 @endphp
 
@@ -43,6 +44,20 @@
                 >
                     {{ $isReviewer ? __('Forwarded to me') : __('Applications') }}
                 </flux:sidebar.item>
+
+                @unless ($isSuperAdmin)
+                    <flux:sidebar.item
+                        icon="inbox"
+                        :href="route($routePrefix.'inbox')"
+                        :current="request()->routeIs($routePrefix.'inbox')"
+                        :badge="$inboxUnreadCount > 0 ? $inboxUnreadCount : null"
+                        wire:navigate
+                        :class="$navItemClass"
+                        data-test="sidebar-inbox"
+                    >
+                        {{ __('Inbox') }}
+                    </flux:sidebar.item>
+                @endunless
 
                 @unless ($isReviewer)
                 @if ($isSuperAdmin)
@@ -239,7 +254,7 @@
             @if (auth()->user()?->googleAccount?->needs_reconnect)
                 <div class="mb-5 flex flex-wrap items-center gap-3 rounded-[14px] border border-[#F2D49B] bg-[#FFF1D6] px-4 py-3 text-sm text-[#7A4A00]" role="alert" data-test="gmail-reconnect-banner">
                     <flux:icon icon="exclamation-triangle" variant="mini" class="size-5 shrink-0" />
-                    <span class="flex-1">{{ __('Reconnect your Gmail. Google no longer accepts the portal\'s access, so forward emails cannot be sent.') }}</span>
+                    <span class="flex-1">{{ __('Reconnect your Gmail. Google no longer accepts the portal\'s access, so your correspondence is saved but not emailed until you reconnect.') }}</span>
                     <flux:button size="sm" :href="route('google.connect')">{{ __('Reconnect Gmail') }}</flux:button>
                 </div>
             @endif

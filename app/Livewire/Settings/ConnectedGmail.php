@@ -3,7 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Models\GoogleAccount;
-use App\Support\Forwarding\ForwardEmailBuilder;
+use App\Support\Correspondence\CorrespondenceEmailBuilder;
 use App\Support\Gmail\GmailNotConnected;
 use App\Support\Gmail\GmailSender;
 use Flux\Flux;
@@ -80,13 +80,13 @@ class ConnectedGmail extends Component
 
         RateLimiter::hit($throttleKey, 600);
 
-        $data = ['user' => $user, 'logo' => 'cid:'.ForwardEmailBuilder::LOGO_CID];
+        $data = ['user' => $user, 'logo' => 'cid:'.CorrespondenceEmailBuilder::LOGO_CID];
         $email = (new Email)
             ->to($account->google_email)
             ->subject(config('mail.subject_prefix').' '.__('Gmail test email'))
             ->html(view('mail.gmail.test', $data)->render())
             ->text(__('Your Gmail is connected. Forwards you send from the portal will be emailed from this account.'))
-            ->embedFromPath(public_path('images/superior-logo-white.png'), ForwardEmailBuilder::LOGO_CID, 'image/png');
+            ->embedFromPath(public_path('images/superior-logo-white.png'), CorrespondenceEmailBuilder::LOGO_CID, 'image/png');
 
         try {
             $gmail->send($user, $email);

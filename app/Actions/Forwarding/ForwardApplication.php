@@ -2,36 +2,34 @@
 
 namespace App\Actions\Forwarding;
 
+use App\Actions\Correspondence\PostCorrespondence;
 use App\Enums\ApplicationEventType;
-use App\Enums\ForwardEmailStatus;
+use App\Enums\CorrespondenceParty;
+use App\Enums\CorrespondenceType;
 use App\Enums\ForwardTarget;
 use App\Models\Application;
 use App\Models\ApplicationEvent;
-use App\Models\ApplicationForward;
+use App\Models\CorrespondenceMessage;
 use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\ApplicationForwardedForReview;
 use App\Notifications\ApplicationForwardedOnward;
-use App\Notifications\ApplicationForwardedToReviewer;
-use App\Support\Forwarding\ForwardMailer;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Records one forward of an application (who may forward where is the
- * ApplicationPolicy's job; the caller authorizes first). The status is
- * left unchanged. The HOD/Dean gets a notification, the student a short
- * one with no note, and the Admin Officers one when an HOD or Dean
- * passes it on. Every forward is handed to the ForwardMailer, which
- * emails it from the sender's own Gmail, so a sender without a usable
- * Gmail connection cannot forward.
+ * Records one forward of an application as a message in its
+ * correspondence thread (who may forward where is the ApplicationPolicy's
+ * job; the caller authorizes first). The status is left unchanged. The
+ * HOD/Dean is notified, the student gets a short notice with no note, and
+ * the Admin Officers are told when an HOD or Dean passes it on. The email
+ * goes from the sender's own Gmail, or waits until they connect it.
  */
 class ForwardApplication
 {
     public const REGISTRAR_EMAIL_SETTING = 'forwarding.registrar_email';
 
-    public function __construct(private ForwardMailer $mailer) {}
+    public function __construct(private PostCorrespondence $post) {}
 
     /**
      * Why a forward to this target is not possible right now (no active
@@ -57,91 +55,57 @@ class ForwardApplication
     }
 
     /**
-     * @throws ValidationException when the sender has no usable Gmail or the target has no recipient
+     * @throws ValidationException when the target has no recipient
      */
-    public function handle(Application $application, User $sender, ForwardTarget $target, string $note): ApplicationForward
+    public function handle(Application $application, User $sender, ForwardTarget $target, string $note, string $idempotencyKey): CorrespondenceMessage
     {
-        if (! $sender->hasConnectedGmail()) {
-            throw ValidationException::withMessages(['forward_target' => self::gmailRequiredMessage($sender)]);
-        }
-
         $reason = $this->unavailableReason($application, $target);
 
         if ($reason !== null) {
             throw ValidationException::withMessages(['forward_target' => $reason]);
         }
 
-        $fromRole = $sender->staffRole();
-        $recipient = match ($target) {
-            ForwardTarget::Hod => User::activeHodForDepartment($application->department_id),
-            ForwardTarget::Dean => User::activeDeanForFaculty($application->department?->faculty_id),
-            ForwardTarget::Registrar => null,
-        };
+        $fromParty = CorrespondenceParty::forRole($sender->staffRole());
 
-        $forward = DB::transaction(function () use ($application, $sender, $fromRole, $target, $recipient, $note) {
-            $forward = ApplicationForward::create([
-                'application_id' => $application->id,
-                'from_user_id' => $sender->id,
-                'from_role' => $fromRole,
-                'to_role' => $target,
-                'to_user_id' => $recipient?->id,
-                'to_email' => $target === ForwardTarget::Registrar ? self::registrarEmail() : null,
-                'note' => $note,
-                'email_status' => ForwardEmailStatus::PendingEmail,
-            ]);
+        if ($fromParty === null) {
+            throw ValidationException::withMessages(['forward_target' => __('Only the Admin Officer, HOD or Dean can forward.')]);
+        }
 
+        $toParty = CorrespondenceParty::fromForwardTarget($target);
+        $recipient = $this->post->recipientFor($application, $toParty, $fromParty);
+
+        $forward = $this->post->handle($application, $sender, [
+            'type' => CorrespondenceType::Forward,
+            'from_party' => $fromParty,
+            'from_user_id' => $sender->id,
+            'to_party' => $toParty,
+            'to_user_id' => $recipient?->id,
+            'to_email' => $target === ForwardTarget::Registrar ? self::registrarEmail() : null,
+            'body' => $note,
+        ], $idempotencyKey, alsoInTransaction: function (CorrespondenceMessage $forward) use ($application, $sender, $fromParty, $target) {
             $application->update(['forwarded_to' => $target]);
 
             ApplicationEvent::create([
                 'application_id' => $application->id,
                 'user_id' => $sender->id,
                 'event_type' => ApplicationEventType::Forwarded,
-                'from_value' => $fromRole?->value,
+                'from_value' => $fromParty->value,
                 'to_value' => $target->value,
                 'visible_to_student' => true,
             ]);
-
-            return $forward;
         });
 
-        if ($recipient !== null) {
-            $recipient->notify(new ApplicationForwardedToReviewer($application, $forward));
+        if (! $forward->wasRecentlyCreated) {
+            return $forward;
         }
 
         $application->student->user->notify(new ApplicationForwardedForReview($application, $target));
 
-        if ($fromRole?->isReviewer()) {
+        if ($fromParty !== CorrespondenceParty::AdminOfficer) {
             Notification::send(User::adminOfficersInDepartment($application->department_id), new ApplicationForwardedOnward($application, $forward));
         }
 
-        $this->mailer->send($forward);
-
         return $forward;
-    }
-
-    /**
-     * Send a pending or failed forward email again (the caller authorizes
-     * first). Old "pending email" Registrar forwards go out this way once
-     * the forwarder has connected Gmail.
-     *
-     * @throws ValidationException when the forwarder has no usable Gmail
-     */
-    public function resendEmail(ApplicationForward $forward): void
-    {
-        if (! $forward->sender->hasConnectedGmail()) {
-            throw ValidationException::withMessages(['forward_email' => self::gmailRequiredMessage($forward->sender)]);
-        }
-
-        $forward->update(['email_status' => ForwardEmailStatus::PendingEmail, 'email_error' => null]);
-
-        $this->mailer->send($forward);
-    }
-
-    public static function gmailRequiredMessage(User $sender): string
-    {
-        return $sender->googleAccount?->needs_reconnect
-            ? __('Reconnect your Gmail first: Settings → Profile → Connected Gmail. Forwards are emailed from your own Gmail.')
-            : __('Connect your Gmail first: Settings → Profile → Connected Gmail. Forwards are emailed from your own Gmail.');
     }
 
     public static function registrarEmail(): ?string

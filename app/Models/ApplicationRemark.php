@@ -11,8 +11,9 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
- * An HOD's or Dean's remark on an application forwarded to them.
- * Staff-only: never loaded in any student view.
+ * Legacy: an HOD's or Dean's remark in the old forwarding chain. Copied
+ * into correspondence_messages and kept read-only (old audit-log entries
+ * point here) until the table is dropped. Write correspondence instead.
  *
  * @property int $application_id
  * @property int $application_forward_id

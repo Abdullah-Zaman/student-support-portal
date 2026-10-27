@@ -9,8 +9,6 @@ use App\Listeners\RecordSuccessfulLogin;
 use App\Models\User;
 use App\Policies\ActivityPolicy;
 use App\Support\BrandedMailMessage;
-use App\Support\Forwarding\ForwardMailer;
-use App\Support\Forwarding\GmailForwardMailer;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Login;
@@ -30,14 +28,6 @@ use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
-    public function register(): void
-    {
-        $this->app->bind(ForwardMailer::class, GmailForwardMailer::class);
-    }
-
     /**
      * Bootstrap any application services.
      */

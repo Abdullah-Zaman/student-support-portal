@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Forwarding\AddRemark;
 use App\Enums\ForwardTarget;
+use App\Enums\RemarkType;
 use App\Livewire\Admin\Applications\Index;
 use App\Livewire\Admin\Applications\Show;
 use App\Models\Department;
@@ -34,19 +36,13 @@ test('the applications list shows where each application was forwarded and filte
     'Registrar' => ['registrar', ['Sent to the Registrar'], ['Never forwarded', 'Sent to the HOD', 'Sent to the Dean']],
 ]);
 
-test('the admin application view shows the forward chain with remarks', function () {
+test('the admin application view shows the correspondence with remarks', function () {
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     $hod = createHod($department);
     $application = createApplicationInDepartment($department, createStudentUser($department));
-    $forward = recordForward($application, ForwardTarget::Hod, $admin, 'Please advise on the instalment plan.');
-    $forward->remarks()->create([
-        'application_id' => $application->id,
-        'author_id' => $hod->id,
-        'author_role' => 'hod',
-        'type' => 'recommended',
-        'body' => 'Supported by the department.',
-    ]);
+    recordForward($application, ForwardTarget::Hod, $admin, 'Please advise on the instalment plan.');
+    app(AddRemark::class)->handle($application, $hod, RemarkType::Recommended, 'Supported by the department.', 'remark-key');
 
     Livewire::actingAs($admin)
         ->test(Show::class, ['application' => $application])

@@ -34,9 +34,9 @@ class Dashboard extends Component
 
         return [
             'forwarded' => $this->inbox()->count(),
-            'awaiting' => $this->inbox()->whereDoesntHave('remarks', fn (Builder $query) => $query->where('author_role', $role))->count(),
-            'remarked' => $this->inbox()->whereHas('remarks', fn (Builder $query) => $query->where('author_role', $role))->count(),
-            'onward' => $this->inbox()->whereHas('forwards', fn (Builder $query) => $query->where('from_role', $role))->count(),
+            'awaiting' => $this->inbox()->whereDoesntHave('remarks', fn (Builder $query) => $query->where('from_party', $role))->count(),
+            'remarked' => $this->inbox()->whereHas('remarks', fn (Builder $query) => $query->where('from_party', $role))->count(),
+            'onward' => $this->inbox()->whereHas('forwards', fn (Builder $query) => $query->where('from_party', $role))->count(),
         ];
     }
 
@@ -48,7 +48,7 @@ class Dashboard extends Component
     {
         return $this->inbox()
             ->with(['category', 'student.user'])
-            ->withMax(['forwards as forwarded_at' => fn (Builder $query) => $query->where('to_role', $this->role())], 'created_at')
+            ->withMax(['forwards as forwarded_at' => fn (Builder $query) => $query->where('to_party', $this->role())], 'created_at')
             ->orderByDesc('forwarded_at')
             ->take(5)
             ->get();

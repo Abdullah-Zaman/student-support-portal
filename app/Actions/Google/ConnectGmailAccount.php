@@ -2,6 +2,7 @@
 
 namespace App\Actions\Google;
 
+use App\Actions\Correspondence\QueueCorrespondenceEmail;
 use App\Models\GoogleAccount;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
@@ -10,10 +11,14 @@ use Laravel\Socialite\Two\User as GoogleUser;
 /**
  * Stores (or replaces) a staff member's Gmail connection from Google's
  * OAuth callback. The Google account must be the staff member's portal
- * email, unless email mismatch is allowed (never in production).
+ * email, unless email mismatch is allowed (never in production). Any
+ * correspondence they wrote while Gmail was not connected is then queued
+ * for sending.
  */
 class ConnectGmailAccount
 {
+    public function __construct(private QueueCorrespondenceEmail $queueCorrespondenceEmail) {}
+
     /**
      * @throws ValidationException when the account cannot be connected
      */
@@ -59,6 +64,9 @@ class ConnectGmailAccount
             ->performedOn($account)
             ->withProperties(['google_email' => $googleEmail])
             ->log('gmail connected');
+
+        $user->unsetRelation('googleAccount');
+        $this->queueCorrespondenceEmail->pendingFor($user);
 
         return $account;
     }

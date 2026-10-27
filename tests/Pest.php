@@ -1,11 +1,12 @@
 <?php
 
-use App\Enums\ForwardEmailStatus;
+use App\Enums\CorrespondenceEmailStatus;
+use App\Enums\CorrespondenceParty;
 use App\Enums\ForwardTarget;
 use App\Enums\RoleName;
 use App\Models\Application;
 use App\Models\ApplicationCategory;
-use App\Models\ApplicationForward;
+use App\Models\CorrespondenceMessage;
 use App\Models\Department;
 use App\Models\Faculty;
 use App\Models\GoogleAccount;
@@ -246,22 +247,27 @@ function fakeGmailApi(): void
     Http::fake([
         'oauth2.googleapis.com/token' => Http::response(['access_token' => 'ya29.refreshed', 'expires_in' => 3599]),
         'oauth2.googleapis.com/revoke' => Http::response(),
-        'gmail.googleapis.com/upload/gmail/v1/users/me/messages/send*' => Http::response(['id' => 'gmail-message-1']),
+        'gmail.googleapis.com/upload/gmail/v1/users/me/messages/send*' => Http::response(['id' => 'gmail-message-1', 'threadId' => 'gmail-thread-1']),
     ]);
 }
 
 /**
- * Record a forward directly (no notifications), for arranging a test.
+ * Record a forward directly in the correspondence thread (no
+ * notifications, no email), for arranging a test. Pass the recipient to
+ * address it to a specific HOD or Dean.
  */
-function recordForward(Application $application, ForwardTarget $target, User $from, string $note = 'Please review.'): ApplicationForward
+function recordForward(Application $application, ForwardTarget $target, User $from, string $note = 'Please review.', ?User $to = null): CorrespondenceMessage
 {
-    $forward = ApplicationForward::create([
+    $forward = CorrespondenceMessage::factory()->create([
         'application_id' => $application->id,
+        'author_id' => $from->id,
+        'from_party' => CorrespondenceParty::forRole($from->staffRole()),
         'from_user_id' => $from->id,
-        'from_role' => $from->staffRole(),
-        'to_role' => $target,
-        'note' => $note,
-        'email_status' => $target === ForwardTarget::Registrar ? ForwardEmailStatus::PendingEmail : ForwardEmailStatus::NotRequired,
+        'to_party' => CorrespondenceParty::fromForwardTarget($target),
+        'to_user_id' => $to?->id,
+        'to_email' => $target === ForwardTarget::Registrar ? 'registrar@superior.edu.pk' : null,
+        'body' => $note,
+        'email_status' => CorrespondenceEmailStatus::NotEmailed,
     ]);
 
     $application->update(['forwarded_to' => $target]);

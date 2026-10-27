@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\ApplicationPriority;
 use App\Enums\ApplicationStatus;
+use App\Enums\CorrespondenceParty;
+use App\Enums\CorrespondenceType;
 use App\Enums\ForwardTarget;
 use App\Enums\MessageType;
 use App\Enums\RoleName;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -138,23 +141,74 @@ class Application extends Model
     }
 
     /**
-     * Staff-only forwarding chain. Never load this in a student view.
+     * Staff-only correspondence thread (forwards, replies, remarks,
+     * logged Registrar replies). Never load this in a student view.
      *
-     * @return HasMany<ApplicationForward, $this>
+     * @return HasMany<CorrespondenceMessage, $this>
      */
-    public function forwards(): HasMany
+    public function correspondence(): HasMany
     {
-        return $this->hasMany(ApplicationForward::class);
+        return $this->hasMany(CorrespondenceMessage::class);
     }
 
     /**
-     * Staff-only HOD/Dean remarks. Never load this in a student view.
+     * Forwards in the correspondence thread. Staff-only.
      *
-     * @return HasMany<ApplicationRemark, $this>
+     * @return HasMany<CorrespondenceMessage, $this>
+     */
+    public function forwards(): HasMany
+    {
+        return $this->correspondence()->where('type', CorrespondenceType::Forward);
+    }
+
+    /**
+     * HOD/Dean remarks in the correspondence thread. Staff-only.
+     *
+     * @return HasMany<CorrespondenceMessage, $this>
      */
     public function remarks(): HasMany
     {
-        return $this->hasMany(ApplicationRemark::class);
+        return $this->correspondence()->where('type', CorrespondenceType::Remark);
+    }
+
+    /**
+     * @return HasOne<CorrespondenceMessage, $this>
+     */
+    public function latestCorrespondence(): HasOne
+    {
+        return $this->hasOne(CorrespondenceMessage::class)->latestOfMany('id');
+    }
+
+    /**
+     * The latest correspondence message to or from the Admin Officer,
+     * for the "With HOD · awaiting reply" / "HOD replied" list badges.
+     *
+     * @return HasOne<CorrespondenceMessage, $this>
+     */
+    public function latestAdminCorrespondence(): HasOne
+    {
+        return $this->hasOne(CorrespondenceMessage::class)->ofMany(
+            ['id' => 'max'],
+            fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->where('from_party', CorrespondenceParty::AdminOfficer)
+                ->orWhere('to_party', CorrespondenceParty::AdminOfficer)),
+        );
+    }
+
+    /**
+     * Every party that has sent or received a message in this thread.
+     *
+     * @return list<CorrespondenceParty>
+     */
+    public function correspondenceParties(): array
+    {
+        $rows = $this->correspondence()->toBase()->distinct()->get(['from_party', 'to_party']);
+
+        return array_values(collect($rows)
+            ->flatMap(fn (object $row) => [$row->from_party, $row->to_party])
+            ->unique()
+            ->map(fn (string $party) => CorrespondenceParty::from($party))
+            ->all());
     }
 
     /**
@@ -179,15 +233,32 @@ class Application extends Model
     {
         if ($reviewer->hasRole(RoleName::Hod->value) && $reviewer->department_id !== null) {
             return $query->where($query->qualifyColumn('department_id'), $reviewer->department_id)
-                ->whereHas('forwards', fn (Builder $query) => $query->where('to_role', ForwardTarget::Hod));
+                ->whereHas('correspondence', fn (Builder $query) => $query->where('to_party', CorrespondenceParty::Hod));
         }
 
         if ($reviewer->hasRole(RoleName::Dean->value) && $reviewer->faculty_id !== null) {
             return $query->whereHas('department', fn (Builder $query) => $query->where('faculty_id', $reviewer->faculty_id))
-                ->whereHas('forwards', fn (Builder $query) => $query->where('to_role', ForwardTarget::Dean));
+                ->whereHas('correspondence', fn (Builder $query) => $query->where('to_party', CorrespondenceParty::Dean));
         }
 
         return $query->whereRaw('1 = 0');
+    }
+
+    /**
+     * Applications with correspondence the given staff member takes part
+     * in: an Admin Officer every thread of their department, an HOD or
+     * Dean those forwarded to them. Anyone else gets no rows.
+     *
+     * @param  Builder<Application>  $query
+     * @return Builder<Application>
+     */
+    public function scopeWithCorrespondenceFor(Builder $query, User $staff): Builder
+    {
+        if ($staff->hasRole(RoleName::AdminOfficer->value)) {
+            return $query->where($query->qualifyColumn('department_id'), $staff->department_id)->has('correspondence');
+        }
+
+        return $query->forwardedTo($staff);
     }
 
     public function isForwardedTo(User $reviewer): bool

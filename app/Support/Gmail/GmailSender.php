@@ -19,20 +19,22 @@ use Symfony\Component\Mime\Email;
  */
 class GmailSender
 {
-    public const SEND_URL = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=media';
+    public const SEND_URL = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart';
 
     public const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
     public const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 
     /**
-     * Returns the Gmail message id.
+     * Pass the thread id Gmail returned for the sender's previous email
+     * of the same conversation to keep it in one thread in their mailbox
+     * (Gmail also needs the same subject for that).
      *
      * @throws GmailNotConnected when the sender must (re)connect Gmail
      * @throws RequestException when Gmail rejects the message
      * @throws ConnectionException when Google cannot be reached
      */
-    public function send(User $sender, Email $email): string
+    public function send(User $sender, Email $email, ?string $threadId = null): GmailSentMessage
     {
         $account = $sender->googleAccount;
 
@@ -47,13 +49,17 @@ class GmailSender
         $email->from(new Address($account->google_email, $sender->name));
         $this->applyAlwaysTo($email);
 
-        $response = $this->post($this->accessToken($account), $email);
+        $response = $this->post($this->accessToken($account), $email, $threadId);
 
         if ($response->status() === 401) {
-            $response = $this->post($this->accessToken($account, forceRefresh: true), $email);
+            $response = $this->post($this->accessToken($account, forceRefresh: true), $email, $threadId);
         }
 
-        return (string) $response->throw()->json('id');
+        $response->throw();
+
+        $sentThreadId = $response->json('threadId');
+
+        return new GmailSentMessage((string) $response->json('id'), is_string($sentThreadId) ? $sentThreadId : null);
     }
 
     /**
@@ -99,10 +105,25 @@ class GmailSender
         return (string) $account->access_token;
     }
 
-    private function post(string $accessToken, Email $email): Response
+    /**
+     * A multipart upload: JSON metadata (the thread id) and the raw MIME
+     * message, which may be larger than a JSON "raw" field allows.
+     */
+    private function post(string $accessToken, Email $email, ?string $threadId): Response
     {
+        $boundary = 'portal-'.bin2hex(random_bytes(12));
+        $metadata = $threadId !== null ? ['threadId' => $threadId] : (object) [];
+
+        $body = "--{$boundary}\r\n"
+            ."Content-Type: application/json; charset=UTF-8\r\n\r\n"
+            .json_encode($metadata)."\r\n"
+            ."--{$boundary}\r\n"
+            ."Content-Type: message/rfc822\r\n\r\n"
+            .$email->toString()."\r\n"
+            ."--{$boundary}--";
+
         return Http::withToken($accessToken)
-            ->withBody($email->toString(), 'message/rfc822')
+            ->withBody($body, 'multipart/related; boundary='.$boundary)
             ->post(self::SEND_URL);
     }
 

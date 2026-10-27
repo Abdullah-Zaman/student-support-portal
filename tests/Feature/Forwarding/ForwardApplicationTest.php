@@ -3,18 +3,18 @@
 use App\Actions\Forwarding\ForwardApplication;
 use App\Enums\ApplicationEventType;
 use App\Enums\ApplicationStatus;
-use App\Enums\ForwardEmailStatus;
+use App\Enums\CorrespondenceEmailStatus;
+use App\Enums\CorrespondenceParty;
 use App\Enums\ForwardTarget;
 use App\Livewire\Admin\Applications\Show as AdminShow;
 use App\Livewire\Reviewer\Applications\Show as ReviewerShow;
-use App\Models\ApplicationForward;
+use App\Models\CorrespondenceMessage;
 use App\Models\Department;
 use App\Models\Faculty;
 use App\Models\Setting;
 use App\Notifications\ApplicationForwardedForReview;
 use App\Notifications\ApplicationForwardedOnward;
-use App\Notifications\ApplicationForwardedToReviewer;
-use App\Support\Forwarding\ForwardMailer;
+use App\Notifications\CorrespondenceReceived;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
@@ -25,8 +25,7 @@ beforeEach(function () {
 
 test('an admin officer forwards an application to their HOD without changing its status', function () {
     Notification::fake();
-    $mailer = Mockery::spy(ForwardMailer::class);
-    app()->instance(ForwardMailer::class, $mailer);
+    fakeGmailApi();
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     connectGmail($admin);
@@ -42,11 +41,11 @@ test('an admin officer forwards an application to their HOD without changing its
         ->call('forward')
         ->assertHasNoErrors();
 
-    $forward = ApplicationForward::query()->sole();
-    expect($forward->to_role)->toBe(ForwardTarget::Hod)
+    $forward = CorrespondenceMessage::query()->sole();
+    expect($forward->to_party)->toBe(CorrespondenceParty::Hod)
         ->and($forward->to_user_id)->toBe($hod->id)
         ->and($forward->from_user_id)->toBe($admin->id)
-        ->and($forward->email_status)->toBe(ForwardEmailStatus::PendingEmail)
+        ->and($forward->email_status)->toBe(CorrespondenceEmailStatus::Sent)
         ->and($application->refresh()->status)->toBe(ApplicationStatus::UnderReview)
         ->and($application->forwarded_to)->toBe(ForwardTarget::Hod);
 
@@ -54,13 +53,12 @@ test('an admin officer forwards an application to their HOD without changing its
     expect($event->visible_to_student)->toBeTrue()
         ->and($event->timelineDescription())->toBe('Forwarded to the HOD.');
 
-    Notification::assertSentTo($hod, ApplicationForwardedToReviewer::class);
+    Notification::assertSentTo($hod, CorrespondenceReceived::class);
     Notification::assertSentTo($student, ApplicationForwardedForReview::class, function (ApplicationForwardedForReview $notification, array $channels) use ($student, $application) {
         return $channels === ['database']
             && $notification->toArray($student)['message'] === "Your application {$application->application_no} has been forwarded to the HOD for review.";
     });
     Notification::assertNothingSentTo($admin);
-    $mailer->shouldHaveReceived('send')->once()->with(Mockery::on(fn (ApplicationForward $sent) => $sent->is($forward)));
 
     expect(Activity::query()->where('subject_type', $forward->getMorphClass())->where('subject_id', $forward->id)->exists())->toBeTrue();
 });
@@ -81,7 +79,7 @@ test('a forward is blocked with a clear message when the department has no activ
         ->call('forward')
         ->assertHasErrors(['forward_target']);
 
-    expect(ApplicationForward::query()->count())->toBe(0);
+    expect(CorrespondenceMessage::query()->count())->toBe(0);
 });
 
 test('a forward to the Dean is blocked when the faculty has no active Dean', function () {
@@ -109,8 +107,8 @@ test('an HOD forwards to the Registrar by email and the admin officers are told'
         ->call('forward')
         ->assertHasNoErrors();
 
-    $forward = ApplicationForward::query()->where('to_role', ForwardTarget::Registrar)->sole();
-    expect($forward->email_status)->toBe(ForwardEmailStatus::Sent)
+    $forward = CorrespondenceMessage::query()->where('to_party', CorrespondenceParty::Registrar)->sole();
+    expect($forward->email_status)->toBe(CorrespondenceEmailStatus::Sent)
         ->and($forward->to_email)->toBe('registrar@superior.edu.pk')
         ->and($forward->to_user_id)->toBeNull()
         ->and($application->refresh()->forwarded_to)->toBe(ForwardTarget::Registrar);
@@ -146,7 +144,7 @@ test('only the allowed forwarding paths are permitted', function (string $sender
     recordForward($application, ForwardTarget::Hod, $admin);
     recordForward($application, ForwardTarget::Dean, $hod);
 
-    $user = ['admin' => $admin, 'hod' => $hod, 'dean' => $dean, 'student' => $student][$sender];
+    $user = ['admin' => $admin, 'hod' => $hod, 'dean' => $dean, 'student' => $student, 'super admin' => createSuperAdmin()][$sender];
 
     expect($user->can('forward', [$application, $target]))->toBe($allowed);
 })->with([
@@ -160,6 +158,7 @@ test('only the allowed forwarding paths are permitted', function (string $sender
     'Dean to HOD' => ['dean', ForwardTarget::Hod, false],
     'Dean to Dean' => ['dean', ForwardTarget::Dean, false],
     'student to HOD' => ['student', ForwardTarget::Hod, false],
+    'super admin to HOD' => ['super admin', ForwardTarget::Hod, false],
 ]);
 
 test('an illegal forward path is rejected by the action', function () {
@@ -175,7 +174,7 @@ test('an illegal forward path is rejected by the action', function () {
         ->call('forward')
         ->assertForbidden();
 
-    expect(ApplicationForward::query()->count())->toBe(0);
+    expect(CorrespondenceMessage::query()->count())->toBe(0);
 });
 
 test('an HOD cannot forward an application that was not forwarded to them', function () {

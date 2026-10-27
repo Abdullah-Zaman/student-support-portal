@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\AnnouncementFileController;
 use App\Http\Controllers\ApplicationAttachmentController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\CorrespondenceAttachmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
@@ -16,6 +17,7 @@ use App\Livewire\Admin\Students\Index as AdminStudentsIndex;
 use App\Livewire\Admin\Students\Show as AdminStudentsShow;
 use App\Livewire\Admin\Timetables\Index as AdminTimetablesIndex;
 use App\Livewire\Admin\Timetables\Show as AdminTimetablesShow;
+use App\Livewire\Correspondence\Inbox as CorrespondenceInbox;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Reviewer\Applications\Index as ReviewerApplicationsIndex;
 use App\Livewire\Reviewer\Applications\Show as ReviewerApplicationsShow;
@@ -60,6 +62,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('applications/attachments/{attachment}', [ApplicationAttachmentController::class, 'show'])
         ->name('applications.attachments.show');
 
+    Route::get('correspondence/attachments/{attachment}', [CorrespondenceAttachmentController::class, 'show'])
+        ->name('correspondence.attachments.show');
+
     Route::get('announcements/{announcement}/image', [AnnouncementFileController::class, 'image'])
         ->name('announcements.image.show');
     Route::get('announcements/{announcement}/attachment', [AnnouncementFileController::class, 'attachment'])
@@ -91,6 +96,7 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value])
 
         Route::livewire('applications', AdminApplicationsIndex::class)->name('applications.index');
         Route::livewire('applications/{application}', AdminApplicationsShow::class)->name('applications.show');
+        Route::livewire('inbox', CorrespondenceInbox::class)->name('inbox');
 
         Route::livewire('students', AdminStudentsIndex::class)->name('students.index');
         Route::livewire('students/{student}', AdminStudentsShow::class)->name('students.show');
@@ -144,6 +150,7 @@ foreach ([RoleName::Hod, RoleName::Dean] as $reviewerRole) {
             Route::livewire('dashboard', ReviewerDashboard::class)->name('dashboard');
             Route::livewire('applications', ReviewerApplicationsIndex::class)->name('applications.index');
             Route::livewire('applications/{application}', ReviewerApplicationsShow::class)->name('applications.show');
+            Route::livewire('inbox', CorrespondenceInbox::class)->name('inbox');
             Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
         });
 }

@@ -5,11 +5,11 @@ use App\Enums\RemarkType;
 use App\Livewire\Reviewer\Applications\Index;
 use App\Livewire\Reviewer\Applications\Show;
 use App\Models\ApplicationAttachment;
-use App\Models\ApplicationRemark;
+use App\Models\CorrespondenceMessage;
 use App\Models\Department;
 use App\Models\Faculty;
 use App\Models\InternalNote;
-use App\Notifications\RemarkAdded;
+use App\Notifications\CorrespondenceReceived;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -85,7 +85,7 @@ test('a Dean sees only applications forwarded to the Dean from their own faculty
     $this->actingAs($dean)->get(route('dean.applications.show', $toDean))->assertOk();
 });
 
-test('the reviewer view shows the forward chain but never internal notes or priority', function () {
+test('the reviewer view shows the correspondence but never internal notes or priority', function () {
     $department = Department::factory()->create();
     $hod = createHod($department);
     $admin = createAdminOfficer($department);
@@ -107,7 +107,7 @@ test('an HOD adds a remark and the admin officers are notified', function () {
     $hod = createHod($department);
     $admin = createAdminOfficer($department);
     $application = createApplicationInDepartment($department, createStudentUser($department));
-    $forward = recordForward($application, ForwardTarget::Hod, $admin);
+    recordForward($application, ForwardTarget::Hod, $admin);
 
     Livewire::actingAs($hod)
         ->test(Show::class, ['application' => $application])
@@ -116,13 +116,13 @@ test('an HOD adds a remark and the admin officers are notified', function () {
         ->call('addRemark')
         ->assertHasNoErrors();
 
-    $remark = ApplicationRemark::query()->sole();
-    expect($remark->type)->toBe(RemarkType::Recommended)
-        ->and($remark->application_forward_id)->toBe($forward->id)
-        ->and($remark->author_id)->toBe($hod->id)
+    $remark = CorrespondenceMessage::query()->where('type', 'remark')->sole();
+    expect($remark->remark_type)->toBe(RemarkType::Recommended)
+        ->and($remark->from_user_id)->toBe($hod->id)
+        ->and($remark->to_user_id)->toBe($admin->id)
         ->and($remark->body)->toBe('Good record, I support it.');
 
-    Notification::assertSentTo($admin, RemarkAdded::class);
+    Notification::assertSentTo($admin, CorrespondenceReceived::class);
 });
 
 test('a comment remark needs text', function () {

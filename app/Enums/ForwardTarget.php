@@ -9,16 +9,17 @@ enum ForwardTarget: string
     case Registrar = 'registrar';
 
     /**
-     * Where each role may forward an application. Admin Officer (and
-     * Super Admin) → HOD or Dean; HOD → Dean or Registrar; Dean →
-     * Registrar. Any other role may not forward at all.
+     * Where each role may forward an application. Admin Officer → HOD
+     * or Dean; HOD → Dean or Registrar; Dean → Registrar. Any other role
+     * (including the Super Admin, who only reads correspondence) may not
+     * forward at all.
      *
      * @return list<self>
      */
     public static function allowedFrom(RoleName $role): array
     {
         return match ($role) {
-            RoleName::AdminOfficer, RoleName::SuperAdmin => [self::Hod, self::Dean],
+            RoleName::AdminOfficer => [self::Hod, self::Dean],
             RoleName::Hod => [self::Dean, self::Registrar],
             RoleName::Dean => [self::Registrar],
             default => [],

@@ -58,13 +58,13 @@
                                     @if ($latestForward)
                                         <span class="flex flex-col gap-0.5">
                                             <span>{{ $latestForward->created_at->format('j M, g:i A') }}</span>
-                                            <span class="text-[13px] text-subtle">{{ __('by the :role', ['role' => __($latestForward->from_role->label())]) }}</span>
+                                            <span class="text-[13px] text-subtle">{{ __('by the :role', ['role' => __($latestForward->from_party->label())]) }}</span>
                                         </span>
                                     @endif
                                 </td>
                                 <td class="px-3 py-3.5">
                                     @if ($myRemark)
-                                        <flux:badge :color="match ($myRemark->type) { \App\Enums\RemarkType::Recommended => 'green', \App\Enums\RemarkType::NotRecommended => 'red', \App\Enums\RemarkType::Comment => 'zinc' }" size="sm">{{ __($myRemark->type->label()) }}</flux:badge>
+                                        <flux:badge :color="match ($myRemark->remark_type) { \App\Enums\RemarkType::Recommended => 'green', \App\Enums\RemarkType::NotRecommended => 'red', \App\Enums\RemarkType::Comment => 'zinc' }" size="sm">{{ __($myRemark->remark_type?->label() ?? '') }}</flux:badge>
                                     @else
                                         <flux:badge color="amber" size="sm" icon="clock">{{ __('Awaiting') }}</flux:badge>
                                     @endif

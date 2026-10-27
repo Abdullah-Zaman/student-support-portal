@@ -1,17 +1,21 @@
 <?php
 
-use App\Enums\ForwardEmailStatus;
+use App\Enums\CorrespondenceEmailStatus;
+use App\Enums\CorrespondenceParty;
 use App\Enums\ForwardTarget;
 use App\Livewire\Admin\Applications\Show as AdminShow;
+use App\Livewire\Correspondence\Thread;
 use App\Livewire\Reviewer\Applications\Show as ReviewerShow;
 use App\Models\ApplicationAttachment;
-use App\Models\ApplicationForward;
+use App\Models\CorrespondenceMessage;
 use App\Models\Department;
 use App\Models\GoogleAccount;
 use App\Support\Gmail\GmailSender;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Socialite\Socialite;
+use Laravel\Socialite\Two\User as GoogleUser;
 use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 
@@ -33,7 +37,8 @@ function sentGmailMessages(bool $raw = false): array
         ->all();
 }
 
-test('a forward is blocked until the forwarder connects their Gmail', function () {
+test('without a connected Gmail a forward is saved and waits to be emailed', function () {
+    Http::preventStrayRequests();
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     createHod($department);
@@ -41,16 +46,24 @@ test('a forward is blocked until the forwarder connects their Gmail', function (
 
     Livewire::actingAs($admin)
         ->test(AdminShow::class, ['application' => $application])
-        ->assertSee('Connect your Gmail first')
         ->set('forward_target', 'hod')
         ->set('forward_note', 'Please review.')
         ->call('forward')
-        ->assertHasErrors(['forward_target']);
+        ->assertHasNoErrors();
 
-    expect(ApplicationForward::query()->count())->toBe(0);
+    $forward = CorrespondenceMessage::query()->sole();
+    expect($forward->email_status)->toBe(CorrespondenceEmailStatus::AwaitingGmail)
+        ->and($application->refresh()->forwarded_to)->toBe(ForwardTarget::Hod);
+    Http::assertNothingSent();
+
+    Livewire::actingAs($admin)
+        ->test(Thread::class, ['application' => $application])
+        ->assertSee('Connect your Gmail. Your messages are saved in the portal')
+        ->assertSee('Pending: connect Gmail to send');
 });
 
-test('a forward is blocked while the forwarder\'s Gmail needs reconnecting', function () {
+test('a forward from someone whose Gmail needs reconnecting is saved and waits too', function () {
+    Http::preventStrayRequests();
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     GoogleAccount::factory()->needsReconnect()->create(['user_id' => $admin->id]);
@@ -59,16 +72,48 @@ test('a forward is blocked while the forwarder\'s Gmail needs reconnecting', fun
 
     Livewire::actingAs($admin)
         ->test(AdminShow::class, ['application' => $application])
-        ->assertSee('Reconnect your Gmail first')
         ->set('forward_target', 'hod')
         ->set('forward_note', 'Please review.')
         ->call('forward')
-        ->assertHasErrors(['forward_target']);
+        ->assertHasNoErrors();
 
-    expect(ApplicationForward::query()->count())->toBe(0);
+    expect(CorrespondenceMessage::query()->sole()->email_status)->toBe(CorrespondenceEmailStatus::AwaitingGmail);
+    Http::assertNothingSent();
+
+    Livewire::actingAs($admin)
+        ->test(Thread::class, ['application' => $application])
+        ->assertSee('Reconnect your Gmail. Your messages are saved in the portal');
 });
 
-test('a forward is emailed from the forwarder\'s own Gmail with the application, student, remark chain and attachments', function () {
+test('pending messages are emailed automatically once the sender connects Gmail', function () {
+    fakeGmailApi();
+    $department = Department::factory()->create();
+    $hod = createHod($department);
+    $application = createApplicationInDepartment($department, createStudentUser($department));
+    recordForward($application, ForwardTarget::Hod, createAdminOfficer($department));
+    $forward = recordForward($application, ForwardTarget::Registrar, $hod);
+    $forward->update(['email_status' => CorrespondenceEmailStatus::AwaitingGmail]);
+
+    Socialite::fake('google', GoogleUser::fake([
+        'id' => 'google-123',
+        'email' => $hod->email,
+        'token' => 'access-token-abc',
+        'refreshToken' => 'refresh-token-xyz',
+        'expiresIn' => 3599,
+        'approvedScopes' => ['openid', 'email', 'profile', GoogleAccount::GMAIL_SEND_SCOPE],
+    ]));
+
+    $this->actingAs($hod)
+        ->withSession(['google_oauth_intent' => 'connect'])
+        ->get(route('google.callback'))
+        ->assertRedirect(route('profile.edit'));
+
+    expect($forward->refresh()->email_status)->toBe(CorrespondenceEmailStatus::Sent)
+        ->and(sentGmailMessages())->toHaveCount(1)
+        ->and(sentGmailMessages()[0])->toContain('To: registrar@superior.edu.pk');
+});
+
+test('a forward is emailed from the forwarder\'s own Gmail with the application, student, earlier correspondence and attachments', function () {
     fakeGmailApi();
     Storage::fake('local');
     $department = Department::factory()->create();
@@ -96,29 +141,33 @@ test('a forward is emailed from the forwarder\'s own Gmail with the application,
         ->call('forward')
         ->assertHasNoErrors();
 
-    $forward = ApplicationForward::query()->where('to_role', ForwardTarget::Dean)->sole();
-    expect($forward->email_status)->toBe(ForwardEmailStatus::Sent)
+    $forward = CorrespondenceMessage::query()->where('to_party', CorrespondenceParty::Dean)->sole();
+    expect($forward->email_status)->toBe(CorrespondenceEmailStatus::Sent)
         ->and($forward->gmail_message_id)->toBe('gmail-message-1')
+        ->and($forward->gmail_thread_id)->toBe('gmail-thread-1')
         ->and($forward->emailed_at)->not->toBeNull();
 
     $messages = sentGmailMessages();
     expect($messages)->toHaveCount(1)
         ->and($messages[0])->toContain(
             "To: {$dean->email}",
-            $application->application_no,
+            "Subject: [SC-2026-000124] {$application->subject}",
             'Recommended for a fee waiver.',
             'Earlier note from the Admin Office.',
             $student->student->registration_no,
+            'Reply in portal',
+            route('dean.applications.show', $application).'#correspondence',
+            'Please reply through the portal so your response is recorded.',
         )
         ->and(sentGmailMessages(raw: true)[0])->toContain(
             'Content-Disposition: attachment; name=fee-slip.pdf',
             'Content-Disposition: inline; name=superior-logo',
         )
         ->and(preg_match('/^From: .*<'.preg_quote($hod->email, '/').'>/m', $messages[0]))->toBe(1);
-    expect(Activity::query()->where('description', 'forward email sent')->where('subject_id', $forward->id)->exists())->toBeTrue();
+    expect(Activity::query()->where('description', 'correspondence email sent')->where('subject_id', $forward->id)->exists())->toBeTrue();
 });
 
-test('attachments beyond the size limit are listed by name with a portal link instead of attached', function () {
+test('attachments beyond the size limit are listed by name instead of attached', function () {
     fakeGmailApi();
     Storage::fake('local');
     config(['google.forward_attachment_limit_bytes' => 100]);
@@ -143,7 +192,7 @@ test('attachments beyond the size limit are listed by name with a portal link in
         ->set('forward_note', 'Please review.')
         ->call('forward');
 
-    expect(sentGmailMessages()[0])->toContain('Not attached (too large for one email): big-scan.pdf', route('hod.applications.show', $application))
+    expect(sentGmailMessages()[0])->toContain('Not attached (too large for one email): big-scan.pdf')
         ->and(sentGmailMessages(raw: true)[0])->not->toContain('Content-Disposition: attachment');
 });
 
@@ -186,10 +235,10 @@ test('an expired access token is refreshed before sending', function () {
     Http::assertSent(fn (Request $request) => str_starts_with($request->url(), 'https://gmail.googleapis.com/upload/')
         && $request->header('Authorization') === ['Bearer ya29.refreshed']);
     expect($account->refresh()->access_token)->toBe('ya29.refreshed')
-        ->and(ApplicationForward::query()->sole()->email_status)->toBe(ForwardEmailStatus::Sent);
+        ->and(CorrespondenceMessage::query()->sole()->email_status)->toBe(CorrespondenceEmailStatus::Sent);
 });
 
-test('a refused refresh token fails the email, flags the account for reconnecting and shows a banner', function () {
+test('a refused refresh token puts the email back to pending, flags the account for reconnecting and shows a banner', function () {
     Http::preventStrayRequests();
     Http::fake([GmailSender::TOKEN_URL => Http::response(['error' => 'invalid_grant'], 400)]);
     $department = Department::factory()->create();
@@ -205,21 +254,20 @@ test('a refused refresh token fails the email, flags the account for reconnectin
         ->call('forward')
         ->assertHasNoErrors();
 
-    $forward = ApplicationForward::query()->sole();
-    expect($forward->email_status)->toBe(ForwardEmailStatus::Failed)
+    $forward = CorrespondenceMessage::query()->sole();
+    expect($forward->email_status)->toBe(CorrespondenceEmailStatus::AwaitingGmail)
         ->and($forward->email_error)->toBe('Gmail access was revoked or has expired. Reconnect your Gmail in Settings, then retry.')
         ->and($account->refresh()->needs_reconnect)->toBeTrue();
-    expect(Activity::query()->where('description', 'forward email failed')->where('subject_id', $forward->id)->exists())->toBeTrue();
 
     $this->actingAs($admin->fresh())->get(route('admin.dashboard'))->assertSee('Reconnect your Gmail.');
 });
 
-test('a forward email Gmail refuses is marked failed and the forwarder can retry it', function () {
+test('an email Gmail refuses is marked failed and the sender can retry it', function () {
     Http::preventStrayRequests();
     Http::fake([
         'gmail.googleapis.com/upload/*' => Http::sequence()
             ->push(['error' => ['message' => 'Invalid To header']], 400)
-            ->push(['id' => 'gmail-message-2']),
+            ->push(['id' => 'gmail-message-2', 'threadId' => 'gmail-thread-2']),
     ]);
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
@@ -227,59 +275,42 @@ test('a forward email Gmail refuses is marked failed and the forwarder can retry
     createHod($department);
     $application = createApplicationInDepartment($department, createStudentUser($department));
 
-    $component = Livewire::actingAs($admin)
+    Livewire::actingAs($admin)
         ->test(AdminShow::class, ['application' => $application])
         ->set('forward_target', 'hod')
         ->set('forward_note', 'Please review.')
         ->call('forward');
 
-    $forward = ApplicationForward::query()->sole();
-    expect($forward->email_status)->toBe(ForwardEmailStatus::Failed)
+    $forward = CorrespondenceMessage::query()->sole();
+    expect($forward->email_status)->toBe(CorrespondenceEmailStatus::Failed)
         ->and($forward->email_error)->toBe('Gmail refused the email (HTTP 400): Invalid To header');
+    expect(Activity::query()->where('description', 'correspondence email failed')->where('subject_id', $forward->id)->exists())->toBeTrue();
 
-    $component->assertSee('Retry email')->call('sendForwardEmail', $forward->id);
+    Livewire::actingAs($admin)
+        ->test(Thread::class, ['application' => $application])
+        ->assertSee('Retry')
+        ->call('retryEmail', $forward->id);
 
-    expect($forward->refresh()->email_status)->toBe(ForwardEmailStatus::Sent)
+    expect($forward->refresh()->email_status)->toBe(CorrespondenceEmailStatus::Sent)
         ->and($forward->gmail_message_id)->toBe('gmail-message-2')
         ->and($forward->email_attempts)->toBe(2);
 });
 
-test('only the forwarder can send a forward\'s email', function () {
+test('only the sender can retry a message\'s email', function () {
+    Http::preventStrayRequests();
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     $otherAdmin = createAdminOfficer($department);
     connectGmail($otherAdmin);
     $application = createApplicationInDepartment($department, createStudentUser($department));
-    $forward = recordForward($application, ForwardTarget::Registrar, $admin);
+    $forward = recordForward($application, ForwardTarget::Hod, $admin);
+    $forward->update(['email_status' => CorrespondenceEmailStatus::Failed]);
 
     Livewire::actingAs($otherAdmin)
-        ->test(AdminShow::class, ['application' => $application])
-        ->call('sendForwardEmail', $forward->id)
+        ->test(Thread::class, ['application' => $application])
+        ->call('retryEmail', $forward->id)
         ->assertForbidden();
-});
 
-test('a Registrar forward still pending email is sent once the forwarder connects Gmail', function () {
-    fakeGmailApi();
-    $department = Department::factory()->create();
-    $hod = createHod($department);
-    $application = createApplicationInDepartment($department, createStudentUser($department));
-    recordForward($application, ForwardTarget::Hod, createAdminOfficer($department));
-    $forward = recordForward($application, ForwardTarget::Registrar, $hod);
-    $forward->update(['to_email' => 'registrar@superior.edu.pk']);
-
-    Livewire::actingAs($hod)
-        ->test(ReviewerShow::class, ['application' => $application])
-        ->call('sendForwardEmail', $forward->id);
-
-    expect($forward->refresh()->email_status)->toBe(ForwardEmailStatus::PendingEmail);
-
-    connectGmail($hod);
-
-    Livewire::actingAs($hod)
-        ->test(ReviewerShow::class, ['application' => $application])
-        ->assertSee('Send email')
-        ->call('sendForwardEmail', $forward->id);
-
-    expect($forward->refresh()->email_status)->toBe(ForwardEmailStatus::Sent)
-        ->and(sentGmailMessages()[0])->toContain('To: registrar@superior.edu.pk');
+    expect($forward->refresh()->email_status)->toBe(CorrespondenceEmailStatus::Failed);
+    Http::assertNothingSent();
 });

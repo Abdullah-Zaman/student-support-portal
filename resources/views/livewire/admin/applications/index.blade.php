@@ -141,7 +141,11 @@
                                 <td class="px-3 py-3.5">
                                     <div class="flex flex-col items-start gap-1">
                                         <x-status-badge :status="$application->status" />
-                                        <x-forwarded-badge :target="$application->forwarded_to" />
+                                        @php($adminCorrespondence = $application->latestAdminCorrespondence)
+                                        <x-correspondence-badge :message="$adminCorrespondence" />
+                                        @if (! $adminCorrespondence || ($application->forwarded_to && \App\Enums\CorrespondenceParty::fromForwardTarget($application->forwarded_to) !== $adminCorrespondence->counterpartOf(\App\Enums\CorrespondenceParty::AdminOfficer)))
+                                            <x-forwarded-badge :target="$application->forwarded_to" />
+                                        @endif
                                     </div>
                                 </td>
                                 <td class="px-3 py-3.5 whitespace-nowrap text-ink-soft">{{ $application->created_at->format('j M, g:i A') }}</td>
