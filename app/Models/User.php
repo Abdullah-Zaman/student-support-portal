@@ -31,6 +31,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string $password
  * @property UserStatus $status
  * @property string|null $email_signature
+ * @property string|null $mail_to_email
  * @property Carbon|null $last_login_at
  * @property string|null $remember_token
  * @property Carbon|null $created_at

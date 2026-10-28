@@ -53,3 +53,36 @@ test('mail is never redirected in production, even when MAIL_ALWAYS_TO is set', 
 
     expect($capturedRecipients)->toBe(['real.student@superior.edu.pk']);
 });
+
+test('MAIL_STUDENTS_TO redirects the portal\'s own mail to the test inbox when MAIL_ALWAYS_TO is blank', function () {
+    config(['mail.always_to' => null, 'mail.students_to' => 'test-inbox@superior.edu.pk']);
+    (new AppServiceProvider(app()))->boot();
+
+    $capturedRecipients = null;
+    Event::listen(MessageSending::class, function (MessageSending $event) use (&$capturedRecipients) {
+        $capturedRecipients = array_map(fn ($address) => $address->getAddress(), $event->message->getTo());
+    });
+
+    Mail::raw('Test body', function ($message) {
+        $message->to('su92-bssem-f22-172@superior.edu.pk')->subject('Test subject');
+    });
+
+    expect($capturedRecipients)->toBe(['test-inbox@superior.edu.pk']);
+});
+
+test('MAIL_STUDENTS_TO is ignored in production', function () {
+    config(['mail.always_to' => null, 'mail.students_to' => 'test-inbox@superior.edu.pk']);
+    app()->instance('env', 'production');
+    (new AppServiceProvider(app()))->boot();
+
+    $capturedRecipients = null;
+    Event::listen(MessageSending::class, function (MessageSending $event) use (&$capturedRecipients) {
+        $capturedRecipients = array_map(fn ($address) => $address->getAddress(), $event->message->getTo());
+    });
+
+    Mail::raw('Test body', function ($message) {
+        $message->to('su92-bssem-f22-172@superior.edu.pk')->subject('Test subject');
+    });
+
+    expect($capturedRecipients)->toBe(['su92-bssem-f22-172@superior.edu.pk']);
+});

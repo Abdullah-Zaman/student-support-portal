@@ -349,3 +349,64 @@ test('only the sender can retry a message\'s email', function () {
     expect($forward->refresh()->email_status)->toBe(CorrespondenceEmailStatus::Failed);
     Http::assertNothingSent();
 });
+
+test('a staff email goes to the recipient\'s mail_to_email when set, otherwise to their login email', function (?string $mailTo, string $expected) {
+    fakeGmailApi();
+    config(['mail.always_to' => null]);
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    connectGmail($admin);
+    $hod = createHod($department);
+    $hod->forceFill(['mail_to_email' => $mailTo])->save();
+    $application = createApplicationInDepartment($department, createStudentUser($department));
+
+    Livewire::actingAs($admin)
+        ->test(AdminShow::class, ['application' => $application])
+        ->set('forward_target', 'hod')
+        ->set('forward_note', 'Please review.')
+        ->call('forward');
+
+    expect(sentGmailMessages()[0])->toContain('To: '.($expected === 'login' ? $hod->email : $expected));
+})->with([
+    'mail_to_email set' => ['hod.inbox@example.test', 'hod.inbox@example.test'],
+    'mail_to_email null' => [null, 'login'],
+]);
+
+test('in production no redirect applies to staff emails and mail_to_email is still used', function () {
+    fakeGmailApi();
+    config(['mail.always_to' => 'catch-all@superior.edu.pk', 'mail.students_to' => 'catch-all@superior.edu.pk']);
+    app()->instance('env', 'production');
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    connectGmail($admin);
+    $hod = createHod($department);
+    $hod->forceFill(['mail_to_email' => 'hod.inbox@example.test'])->save();
+    $application = createApplicationInDepartment($department, createStudentUser($department));
+
+    Livewire::actingAs($admin)
+        ->test(AdminShow::class, ['application' => $application])
+        ->set('forward_target', 'hod')
+        ->set('forward_note', 'Please review.')
+        ->call('forward');
+
+    expect(sentGmailMessages()[0])->toContain('To: hod.inbox@example.test')
+        ->not->toContain('catch-all@superior.edu.pk');
+});
+
+test('MAIL_STUDENTS_TO does not redirect staff Gmail emails', function () {
+    fakeGmailApi();
+    config(['mail.always_to' => null, 'mail.students_to' => 'student-test@superior.edu.pk']);
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    connectGmail($admin);
+    $hod = createHod($department);
+    $application = createApplicationInDepartment($department, createStudentUser($department));
+
+    Livewire::actingAs($admin)
+        ->test(AdminShow::class, ['application' => $application])
+        ->set('forward_target', 'hod')
+        ->set('forward_note', 'Please review.')
+        ->call('forward');
+
+    expect(sentGmailMessages()[0])->toContain("To: {$hod->email}")->not->toContain('student-test@superior.edu.pk');
+});

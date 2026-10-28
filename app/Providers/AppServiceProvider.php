@@ -95,16 +95,19 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Outside production, MAIL_ALWAYS_TO (if set) redirects every outgoing
-     * email to one inbox — so a non-production environment pointed at a
-     * real SMTP provider never emails an actual student or admin.
+     * Outside production, the portal's own mail (student notifications,
+     * verification, password reset) is redirected to one inbox, so a
+     * non-production environment pointed at a real SMTP provider never
+     * emails an actual student: MAIL_STUDENTS_TO if set, else
+     * MAIL_ALWAYS_TO. Staff Gmail emails are redirected only by
+     * MAIL_ALWAYS_TO (see GmailSender).
      */
     protected function configureMailSafety(): void
     {
-        $alwaysTo = config('mail.always_to');
+        $redirectTo = config('mail.students_to') ?: config('mail.always_to');
 
-        if (! app()->isProduction() && is_string($alwaysTo) && $alwaysTo !== '') {
-            Mail::alwaysTo($alwaysTo);
+        if (! app()->isProduction() && is_string($redirectTo) && $redirectTo !== '') {
+            Mail::alwaysTo($redirectTo);
         }
     }
 }

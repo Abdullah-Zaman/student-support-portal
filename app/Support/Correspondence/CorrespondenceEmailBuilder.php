@@ -98,7 +98,9 @@ class CorrespondenceEmailBuilder
 
     public function recipientEmail(CorrespondenceMessage $message): string
     {
-        return $message->to_user_id !== null ? $message->recipient->email : (string) $message->to_email;
+        return $message->to_user_id !== null
+            ? ($message->recipient->mail_to_email ?? $message->recipient->email)
+            : (string) $message->to_email;
     }
 
     /**

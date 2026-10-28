@@ -31,6 +31,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Student Mail Redirect (non-production only)
+    |--------------------------------------------------------------------------
+    |
+    | Outside production, MAIL_STUDENTS_TO (if set) redirects the portal's
+    | own mail (student notifications, verification, password reset) to one
+    | inbox, while staff Gmail emails still go to their real recipients.
+    | MAIL_ALWAYS_TO catches both. Leave both blank in production.
+    |
+    */
+
+    'students_to' => env('MAIL_STUDENTS_TO'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Mailer Configurations
     |--------------------------------------------------------------------------
     |
