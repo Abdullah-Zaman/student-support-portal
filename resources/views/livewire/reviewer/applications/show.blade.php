@@ -78,7 +78,9 @@
                 </x-panel>
             @endif
 
-            <livewire:correspondence.thread :application="$application" />
+            @can('viewCorrespondence', $application)
+                <livewire:correspondence.thread :application="$application" />
+            @endcan
         </div>
 
         <aside class="flex min-w-0 flex-1 basis-80 flex-col gap-6">

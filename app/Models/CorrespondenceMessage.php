@@ -7,6 +7,7 @@ use App\Enums\CorrespondenceParty;
 use App\Enums\CorrespondenceType;
 use App\Enums\RemarkType;
 use Database\Factories\CorrespondenceMessageFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,11 +17,12 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
- * One message of an application's staff correspondence thread: a
+ * One message of a private staff conversation on an application: a
  * forward, a reply, an HOD/Dean remark or a Registrar reply logged by
- * the Admin Officer. Staff-only: never loaded in any student view.
+ * the HOD or Dean. Only the conversation's two participants may read it.
  *
  * @property int $application_id
+ * @property int|null $conversation_id
  * @property CorrespondenceType $type
  * @property int $author_id
  * @property CorrespondenceParty $from_party
@@ -52,6 +54,7 @@ class CorrespondenceMessage extends Model
 
     protected $fillable = [
         'application_id',
+        'conversation_id',
         'type',
         'author_id',
         'from_party',
@@ -91,7 +94,7 @@ class CorrespondenceMessage extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['application_id', 'type', 'from_party', 'to_party', 'to_user_id', 'to_email', 'remark_type', 'body', 'email_status'])
+            ->logOnly(['application_id', 'conversation_id', 'type', 'from_party', 'to_party', 'remark_type', 'email_status'])
             ->logOnlyDirty();
     }
 
@@ -101,6 +104,25 @@ class CorrespondenceMessage extends Model
     public function application(): BelongsTo
     {
         return $this->belongsTo(Application::class);
+    }
+
+    /**
+     * @return BelongsTo<CorrespondenceConversation, $this>
+     */
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(CorrespondenceConversation::class, 'conversation_id');
+    }
+
+    /**
+     * Messages in conversations the staff member takes part in.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        return $query->whereIn('conversation_id', CorrespondenceConversation::query()->visibleTo($user)->select('correspondence_conversations.id'));
     }
 
     /**

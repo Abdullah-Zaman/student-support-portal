@@ -13,6 +13,7 @@ use App\Enums\RemarkType;
 use App\Enums\RoleName;
 use App\Models\Application;
 use App\Models\ApplicationEvent;
+use App\Models\CorrespondenceConversation;
 use App\Models\CorrespondenceMessage;
 use App\Models\Department;
 use App\Models\User;
@@ -104,6 +105,7 @@ class DemoForwardingSeeder extends Seeder
 
             $message = CorrespondenceMessage::create([
                 'application_id' => $application->id,
+                'conversation_id' => CorrespondenceConversation::between($application->id, $fromParty, $toParty)->id,
                 'type' => $type,
                 'author_id' => $sender->id,
                 'from_party' => $fromParty,

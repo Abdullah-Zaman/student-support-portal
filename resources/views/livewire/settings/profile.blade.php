@@ -24,6 +24,10 @@
                 @endif
             </div>
 
+            @if (auth()->user()->staffRole())
+                <flux:textarea wire:model="email_signature" :label="__('Email signature')" rows="4" maxlength="500" :description="__('Added to the end of the correspondence emails you send. Name, designation, department and university by default.')" />
+            @endif
+
             <div class="flex items-center gap-4">
                 <flux:button variant="primary" type="submit">{{ __('Save') }}</flux:button>
             </div>

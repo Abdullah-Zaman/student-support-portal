@@ -20,6 +20,8 @@ class Profile extends Component
 
     public string $email = '';
 
+    public string $email_signature = '';
+
     /**
      * Mount the component. Students manage their academic profile at
      * /student/profile instead — this page would let them change their
@@ -35,6 +37,7 @@ class Profile extends Component
 
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
+        $this->email_signature = Auth::user()->emailSignature();
     }
 
     /**
@@ -46,7 +49,12 @@ class Profile extends Component
 
         abort_if($user->hasRole(RoleName::Student->value), 403);
 
-        $validated = $this->validate($this->profileRules($user->id));
+        $validated = $this->validate([
+            ...$this->profileRules($user->id),
+            'email_signature' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $validated['email_signature'] = trim((string) $validated['email_signature']) !== '' ? $validated['email_signature'] : null;
 
         $user->fill($validated);
 

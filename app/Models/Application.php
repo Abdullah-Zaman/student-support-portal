@@ -152,6 +152,17 @@ class Application extends Model
     }
 
     /**
+     * Private staff conversations. Always read them through
+     * CorrespondenceConversation::visibleTo().
+     *
+     * @return HasMany<CorrespondenceConversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(CorrespondenceConversation::class);
+    }
+
+    /**
      * Forwards in the correspondence thread. Staff-only.
      *
      * @return HasMany<CorrespondenceMessage, $this>
@@ -196,22 +207,6 @@ class Application extends Model
     }
 
     /**
-     * Every party that has sent or received a message in this thread.
-     *
-     * @return list<CorrespondenceParty>
-     */
-    public function correspondenceParties(): array
-    {
-        $rows = $this->correspondence()->toBase()->distinct()->get(['from_party', 'to_party']);
-
-        return array_values(collect($rows)
-            ->flatMap(fn (object $row) => [$row->from_party, $row->to_party])
-            ->unique()
-            ->map(fn (string $party) => CorrespondenceParty::from($party))
-            ->all());
-    }
-
-    /**
      * Closed and rejected applications are final: no more messages,
      * forwards or remarks.
      */
@@ -245,20 +240,15 @@ class Application extends Model
     }
 
     /**
-     * Applications with correspondence the given staff member takes part
-     * in: an Admin Officer every thread of their department, an HOD or
-     * Dean those forwarded to them. Anyone else gets no rows.
+     * Applications with a private conversation the given staff member
+     * takes part in. Anyone else (including the Super Admin) gets no rows.
      *
      * @param  Builder<Application>  $query
      * @return Builder<Application>
      */
     public function scopeWithCorrespondenceFor(Builder $query, User $staff): Builder
     {
-        if ($staff->hasRole(RoleName::AdminOfficer->value)) {
-            return $query->where($query->qualifyColumn('department_id'), $staff->department_id)->has('correspondence');
-        }
-
-        return $query->forwardedTo($staff);
+        return $query->whereHas('conversations', fn (Builder $conversations) => $conversations->visibleTo($staff));
     }
 
     public function isForwardedTo(User $reviewer): bool

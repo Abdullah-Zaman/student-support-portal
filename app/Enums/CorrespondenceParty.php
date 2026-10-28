@@ -38,20 +38,34 @@ enum CorrespondenceParty: string
     }
 
     /**
-     * Who may reply to whom inside the portal: Admin Officer ↔ HOD,
-     * Admin Officer ↔ Dean and HOD ↔ Dean.
+     * Fixed order of the parties, used to store each conversation's pair
+     * the same way round.
      */
-    public function canReplyTo(self $recipient): bool
+    public function order(): int
     {
-        $pair = [$this, $recipient];
+        return match ($this) {
+            self::AdminOfficer => 1,
+            self::Hod => 2,
+            self::Dean => 3,
+            self::Registrar => 4,
+        };
+    }
 
-        return in_array($pair, [
-            [self::AdminOfficer, self::Hod],
-            [self::Hod, self::AdminOfficer],
-            [self::AdminOfficer, self::Dean],
-            [self::Dean, self::AdminOfficer],
-            [self::Hod, self::Dean],
-            [self::Dean, self::Hod],
+    /**
+     * Whether two parties may hold a conversation: Admin Officer ↔ HOD,
+     * Admin Officer ↔ Dean, HOD ↔ Dean, and HOD or Dean ↔ Registrar.
+     */
+    public function canConverseWith(self $other): bool
+    {
+        $pair = [$this, $other];
+        sort($pair);
+
+        return in_array(array_map(fn (self $party) => $party->value, $pair), [
+            ['admin_officer', 'dean'],
+            ['admin_officer', 'hod'],
+            ['dean', 'hod'],
+            ['dean', 'registrar'],
+            ['hod', 'registrar'],
         ], true);
     }
 

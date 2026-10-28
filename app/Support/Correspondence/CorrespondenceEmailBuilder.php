@@ -12,16 +12,22 @@ use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Mime\Email;
 
 /**
- * Builds the email for one correspondence message. Every email of an
- * application uses the same subject, "[SC-2026-000124] {subject}", and
- * carries Message-ID / In-Reply-To / References headers so mail clients
- * group the conversation. A forward carries the full packet (student,
- * application, earlier correspondence and the application's files); a
- * reply or remark carries its own text and files. The sender's address
- * is set by the GmailSender.
+ * Builds the email for one correspondence message so it reads like a
+ * personally written one: plain HTML plus a plain-text part, no logo or
+ * styling. A forward is "Fwd: {subject} (SC-…)" with the sender's note,
+ * their signature and the forwarded application (the student's own
+ * files attached); a reply or remark is "Re: …" with the message, the
+ * signature and the previous message of the same conversation quoted.
+ * Only this conversation's messages are ever used, never another one's.
+ * Message-ID / In-Reply-To / References follow the conversation. The
+ * sender's address is set by the GmailSender.
  */
 class CorrespondenceEmailBuilder
 {
+    /**
+     * Content-ID of the logo in the Gmail test email (the correspondence
+     * emails themselves carry no logo).
+     */
     public const LOGO_CID = 'superior-logo';
 
     /**
@@ -32,13 +38,14 @@ class CorrespondenceEmailBuilder
 
     public function build(CorrespondenceMessage $message): Email
     {
-        $message->loadMissing(['sender', 'recipient', 'attachments', 'application.student.user', 'application.student.program', 'application.category']);
+        $message->loadMissing(['sender', 'recipient', 'attachments', 'application.student.user', 'application.student.program']);
         $application = $message->application;
         $isForward = $message->type === CorrespondenceType::Forward;
 
-        $earlier = $application->correspondence()
+        $earlier = CorrespondenceMessage::query()
+            ->where('conversation_id', $message->conversation_id)
             ->where('id', '<', $message->id)
-            ->with(['sender', 'recipient'])
+            ->with('sender')
             ->orderBy('id')
             ->get();
 
@@ -53,19 +60,18 @@ class CorrespondenceEmailBuilder
             'application' => $application,
             'student' => $application->student,
             'isForward' => $isForward,
-            'earlier' => $isForward ? $earlier : collect(),
-            'attached' => $attached,
+            'quoted' => $isForward ? null : $earlier->last(),
+            'signature' => $message->sender?->emailSignature() ?? '',
+            'greetingName' => $message->recipientName(),
             'notAttached' => $notAttached,
             'portalUrl' => $this->portalUrl($message),
-            'logo' => 'cid:'.self::LOGO_CID,
         ];
 
         $email = (new Email)
             ->to($this->recipientEmail($message))
             ->subject(self::subject($message))
             ->html(view('mail.gmail.correspondence', $data)->render())
-            ->text(view('mail.gmail.correspondence-text', $data)->render())
-            ->embedFromPath(public_path('images/superior-logo-white.png'), self::LOGO_CID, 'image/png');
+            ->text(view('mail.gmail.correspondence-text', $data)->render());
 
         $this->addThreadingHeaders($email, $message, $earlier);
 
@@ -81,12 +87,13 @@ class CorrespondenceEmailBuilder
     }
 
     /**
-     * The same for every email of the application, so Gmail keeps them
-     * in one conversation.
+     * "Fwd: …" for a forward, "Re: …" for everything after it.
      */
     public static function subject(CorrespondenceMessage $message): string
     {
-        return '['.$message->application->application_no.'] '.$message->application->subject;
+        $prefix = $message->type === CorrespondenceType::Forward ? 'Fwd: ' : 'Re: ';
+
+        return $prefix.$message->application->subject.' ('.$message->application->application_no.')';
     }
 
     public function recipientEmail(CorrespondenceMessage $message): string
@@ -96,7 +103,7 @@ class CorrespondenceEmailBuilder
 
     /**
      * Message-ID is this message's own id. In-Reply-To and References
-     * point at the earlier emails of the thread that actually went out.
+     * point at the earlier emails of the conversation that went out.
      *
      * @param  Collection<int, CorrespondenceMessage>  $earlier
      */
@@ -151,13 +158,15 @@ class CorrespondenceEmailBuilder
     }
 
     /**
-     * Where the recipient opens the thread in the portal (login
-     * required). The Registrar has no portal account.
+     * Where the recipient replies in the portal (login required). The
+     * Registrar has no portal account.
      */
     private function portalUrl(CorrespondenceMessage $message): ?string
     {
         $routeName = $message->to_party->applicationRouteName();
 
-        return $routeName !== null ? route($routeName, $message->application).'#correspondence' : null;
+        return $routeName !== null
+            ? route($routeName, $message->application).'?conversation='.$message->conversation_id.'#correspondence'
+            : null;
     }
 }

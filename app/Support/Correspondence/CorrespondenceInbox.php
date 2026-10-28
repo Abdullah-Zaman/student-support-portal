@@ -3,29 +3,30 @@
 namespace App\Support\Correspondence;
 
 use App\Enums\CorrespondenceParty;
-use App\Models\Application;
+use App\Models\CorrespondenceConversation;
 use App\Models\CorrespondenceMessage;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Inbox queries for the Admin Officer, HOD and Dean. A message is unread
- * until someone holding the recipient's role opens the thread (that also
- * shows it as "Seen" to the sender).
+ * Inbox queries for the Admin Officer, HOD and Dean over their own
+ * private conversations. A message is unread until someone holding the
+ * recipient's role opens its conversation (that also shows it as "Seen"
+ * to the sender).
  */
 class CorrespondenceInbox
 {
     /**
-     * Applications whose correspondence involves this staff member.
-     *
-     * @return Builder<Application>
+     * @return Builder<CorrespondenceConversation>
      */
-    public function applications(User $staff): Builder
+    public function conversations(User $staff): Builder
     {
-        return Application::query()->withCorrespondenceFor($staff);
+        return CorrespondenceConversation::query()->visibleTo($staff);
     }
 
     /**
+     * Messages to the staff member's party that they have not opened.
+     *
      * @return Builder<CorrespondenceMessage>
      */
     public function unreadMessages(User $staff): Builder
@@ -36,11 +37,7 @@ class CorrespondenceInbox
             return CorrespondenceMessage::query()->whereRaw('1 = 0');
         }
 
-        return CorrespondenceMessage::query()
-            ->where('to_party', $party)
-            ->whereNull('seen_at')
-            ->where(fn (Builder $query) => $query->whereNull('from_user_id')->orWhere('from_user_id', '!=', $staff->id))
-            ->whereIn('application_id', $this->applications($staff)->select('applications.id'));
+        return self::constrainToUnread(CorrespondenceMessage::query()->visibleTo($staff), $party, $staff);
     }
 
     public function unreadCount(User $staff): int
@@ -49,24 +46,16 @@ class CorrespondenceInbox
     }
 
     /**
-     * Keep applications where the latest message involving the party was
-     * sent to it (awaiting its reply) or by it (awaiting the other side).
+     * @template TModel of \Illuminate\Database\Eloquent\Model
      *
-     * @param  Builder<Application>  $applications
-     * @return Builder<Application>
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
-    public function whereAwaiting(Builder $applications, CorrespondenceParty $party, bool $awaitingParty): Builder
+    public static function constrainToUnread(Builder $query, CorrespondenceParty $party, User $staff): Builder
     {
-        $latestInvolving = CorrespondenceMessage::query()
-            ->from('correspondence_messages as latest')
-            ->select('latest.id')
-            ->whereColumn('latest.application_id', 'applications.id')
-            ->where(fn (Builder $query) => $query->where('latest.from_party', $party)->orWhere('latest.to_party', $party))
-            ->orderByDesc('latest.id')
-            ->limit(1);
-
-        return $applications->whereHas('correspondence', fn (Builder $query) => $query
-            ->where('correspondence_messages.id', $latestInvolving)
-            ->where($awaitingParty ? 'to_party' : 'from_party', $party));
+        return $query
+            ->where('to_party', $party)
+            ->whereNull('seen_at')
+            ->where(fn (Builder $query) => $query->whereNull('from_user_id')->orWhere('from_user_id', '!=', $staff->id));
     }
 }

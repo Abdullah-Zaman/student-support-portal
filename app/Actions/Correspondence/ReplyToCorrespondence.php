@@ -4,16 +4,16 @@ namespace App\Actions\Correspondence;
 
 use App\Enums\CorrespondenceParty;
 use App\Enums\CorrespondenceType;
-use App\Models\Application;
+use App\Models\CorrespondenceConversation;
 use App\Models\CorrespondenceMessage;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 /**
- * A reply inside the portal between the Admin Officer, HOD and Dean.
- * Which pairs are allowed is the ApplicationPolicy's job (reply ability);
- * the caller authorizes first.
+ * A message inside a private portal conversation (Admin Officer, HOD or
+ * Dean). Whether the sender may write in it is the conversation policy's
+ * job (reply ability); the caller authorizes first.
  */
 class ReplyToCorrespondence
 {
@@ -22,20 +22,22 @@ class ReplyToCorrespondence
     /**
      * @param  array<int, UploadedFile>  $files
      *
-     * @throws ValidationException when there is no one holding the recipient's role
+     * @throws ValidationException when there is no one holding the other side's role
      */
-    public function handle(Application $application, User $sender, CorrespondenceParty $to, string $body, string $idempotencyKey, array $files = []): CorrespondenceMessage
+    public function handle(CorrespondenceConversation $conversation, User $sender, string $body, string $idempotencyKey, array $files = []): CorrespondenceMessage
     {
         $from = CorrespondenceParty::forRole($sender->staffRole());
 
         if ($from === null) {
-            throw ValidationException::withMessages(['reply_to' => __('Only the Admin Officer, HOD or Dean can reply.')]);
+            throw ValidationException::withMessages(['reply_body' => __('Only the Admin Officer, HOD or Dean can reply.')]);
         }
 
+        $to = $conversation->counterpartOf($from);
+        $application = $conversation->application;
         $recipient = $this->post->recipientFor($application, $to, $from);
 
         if ($recipient === null) {
-            throw ValidationException::withMessages(['reply_to' => __('There is no active :party to reply to.', ['party' => $to->label()])]);
+            throw ValidationException::withMessages(['reply_body' => __('There is no active :party to reply to.', ['party' => $to->label()])]);
         }
 
         return $this->post->handle($application, $sender, [

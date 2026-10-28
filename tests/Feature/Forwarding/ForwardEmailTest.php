@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Correspondence\ReplyToCorrespondence;
 use App\Enums\CorrespondenceEmailStatus;
 use App\Enums\CorrespondenceParty;
 use App\Enums\ForwardTarget;
@@ -113,16 +114,17 @@ test('pending messages are emailed automatically once the sender connects Gmail'
         ->and(sentGmailMessages()[0])->toContain('To: registrar@superior.edu.pk');
 });
 
-test('a forward is emailed from the forwarder\'s own Gmail with the application, student, earlier correspondence and attachments', function () {
+test('a forward is a personal-looking email with the sender\'s note, signature, the forwarded application and the student\'s files, and nothing from other conversations', function () {
     fakeGmailApi();
     Storage::fake('local');
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     $hod = createHod($department);
+    $hod->update(['email_signature' => "Dr. Hina Malik\nHead of Department, SE"]);
     connectGmail($hod);
     $student = createStudentUser($department);
     $application = createApplicationInDepartment($department, $student);
-    $application->update(['application_no' => 'SC-2026-000124']);
+    $application->update(['application_no' => 'SC-2026-000124', 'subject' => 'Fee instalment request']);
     Storage::disk('local')->put('attachments/fee-slip.pdf', '%PDF-1.4 fee slip');
     ApplicationAttachment::factory()->create([
         'application_id' => $application->id,
@@ -131,7 +133,7 @@ test('a forward is emailed from the forwarder\'s own Gmail with the application,
         'file_path' => 'attachments/fee-slip.pdf',
         'size' => 17,
     ]);
-    recordForward($application, ForwardTarget::Hod, $admin, 'Earlier note from the Admin Office.');
+    recordForward($application, ForwardTarget::Hod, $admin, 'Private note from the Admin Office.', $hod);
     $dean = createDean($department->faculty);
 
     Livewire::actingAs($hod)
@@ -143,28 +145,61 @@ test('a forward is emailed from the forwarder\'s own Gmail with the application,
 
     $forward = CorrespondenceMessage::query()->where('to_party', CorrespondenceParty::Dean)->sole();
     expect($forward->email_status)->toBe(CorrespondenceEmailStatus::Sent)
-        ->and($forward->gmail_message_id)->toBe('gmail-message-1')
-        ->and($forward->gmail_thread_id)->toBe('gmail-thread-1')
-        ->and($forward->emailed_at)->not->toBeNull();
+        ->and($forward->gmail_thread_id)->toBe('gmail-thread-1');
 
     $messages = sentGmailMessages();
+    $raw = sentGmailMessages(raw: true)[0];
     expect($messages)->toHaveCount(1)
         ->and($messages[0])->toContain(
             "To: {$dean->email}",
-            "Subject: [SC-2026-000124] {$application->subject}",
+            "Subject: Fwd: {$application->subject} (SC-2026-000124)",
+            "Dear {$dean->name},",
             'Recommended for a fee waiver.',
-            'Earlier note from the Admin Office.',
-            $student->student->registration_no,
-            'Reply in portal',
-            route('dean.applications.show', $application).'#correspondence',
-            'Please reply through the portal so your response is recorded.',
+            'Dr. Hina Malik',
+            'Head of Department, SE',
+            '---------- Forwarded application ----------',
+            "From: {$student->name} ({$student->student->registration_no}",
+            'Subject: '.$application->subject,
+            $application->body,
+            'Ref: SC-2026-000124',
+            'Reply on the portal: '.route('dean.applications.show', $application).'?conversation='.$forward->conversation_id.'#correspondence',
         )
-        ->and(sentGmailMessages(raw: true)[0])->toContain(
-            'Content-Disposition: attachment; name=fee-slip.pdf',
-            'Content-Disposition: inline; name=superior-logo',
-        )
+        ->and($messages[0])->not->toContain('Private note from the Admin Office.')
+        ->and($raw)->toContain('Content-Disposition: attachment; name=fee-slip.pdf')
+        ->and($raw)->not->toContain('Content-Disposition: inline')
+        ->and($raw)->not->toContain('<img')
         ->and(preg_match('/^From: .*<'.preg_quote($hod->email, '/').'>/m', $messages[0]))->toBe(1);
     expect(Activity::query()->where('description', 'correspondence email sent')->where('subject_id', $forward->id)->exists())->toBeTrue();
+});
+
+test('a reply is "Re:" with the greeting, the generated signature and only the previous message of its own conversation quoted', function () {
+    fakeGmailApi();
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    $hod = createHod($department);
+    $dean = createDean($department->faculty);
+    connectGmail($admin);
+    $application = createApplicationInDepartment($department, createStudentUser($department));
+    $application->update(['application_no' => 'SC-2026-000124', 'subject' => 'Fee instalment request']);
+
+    $forward = recordForward($application, ForwardTarget::Hod, $admin, 'Please advise on the fee plan.', $hod);
+    recordForward($application, ForwardTarget::Dean, $hod, 'Secret between HOD and Dean.', $dean);
+
+    app(ReplyToCorrespondence::class)->handle($forward->conversation, $admin, 'Any update?', 'reply-key');
+
+    $message = sentGmailMessages()[0];
+    expect($message)->toContain(
+        "Subject: Re: {$application->subject} (SC-2026-000124)",
+        "Dear {$hod->name},",
+        'Any update?',
+        $admin->name,
+        'Admin Officer',
+        'Superior University',
+        'wrote:',
+        '> Please advise on the fee plan.',
+        'Ref: SC-2026-000124',
+    )
+        ->and($message)->not->toContain('Secret between HOD and Dean.');
 });
 
 test('attachments beyond the size limit are listed by name instead of attached', function () {

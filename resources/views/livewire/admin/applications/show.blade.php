@@ -115,7 +115,9 @@
                 </x-panel>
             @endif
 
-            <livewire:correspondence.thread :application="$application" />
+            @can('viewCorrespondence', $application)
+                <livewire:correspondence.thread :application="$application" />
+            @endcan
 
             <x-panel :title="__('Messages')">
                 @if ($this->isFinal)

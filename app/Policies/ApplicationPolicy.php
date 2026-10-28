@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Enums\CorrespondenceParty;
 use App\Enums\ForwardTarget;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
@@ -69,9 +68,10 @@ class ApplicationPolicy
     }
 
     /**
-     * The correspondence thread is for staff only, never students: the
-     * department's Admin Officers, the HOD/Dean it was forwarded to, and
-     * the Super Admin (read-only).
+     * The Conversations panel is for the department's Admin Officers and
+     * the HOD/Dean the application was forwarded to. Which conversations
+     * they see is decided by the conversation policy. Never students or
+     * the Super Admin.
      */
     public function viewCorrespondence(User $user, Application $application): bool
     {
@@ -79,44 +79,7 @@ class ApplicationPolicy
             return $application->isForwardedTo($user);
         }
 
-        return $this->manages($user, $application);
-    }
-
-    /**
-     * Replies inside the portal: Admin Officer ↔ HOD, Admin Officer ↔
-     * Dean and HOD ↔ Dean, only between parties already in this
-     * application's thread, and never once it is closed or rejected.
-     * The Super Admin only reads.
-     */
-    public function reply(User $user, Application $application, CorrespondenceParty $recipient): bool
-    {
-        $sender = CorrespondenceParty::forRole($user->staffRole());
-
-        if ($sender === null || $application->isFinal() || ! $sender->canReplyTo($recipient)) {
-            return false;
-        }
-
-        if (! $this->viewCorrespondence($user, $application)) {
-            return false;
-        }
-
-        $parties = $application->correspondenceParties();
-
-        return in_array($recipient, $parties, true)
-            && ($sender === CorrespondenceParty::AdminOfficer || in_array($sender, $parties, true));
-    }
-
-    /**
-     * The Registrar has no portal account. The Admin Officer records a
-     * reply the Registrar sent by email, once something was forwarded to
-     * the Registrar.
-     */
-    public function logExternalReply(User $user, Application $application): bool
-    {
-        return $user->hasRole(RoleName::AdminOfficer->value)
-            && $this->manages($user, $application)
-            && ! $application->isFinal()
-            && $application->correspondence()->where('to_party', CorrespondenceParty::Registrar)->exists();
+        return $user->hasRole(RoleName::AdminOfficer->value) && $this->manages($user, $application);
     }
 
     public function create(User $user): bool

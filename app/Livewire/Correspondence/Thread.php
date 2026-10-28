@@ -8,14 +8,18 @@ use App\Actions\Correspondence\ReplyToCorrespondence;
 use App\Concerns\ApplicationValidationRules;
 use App\Enums\CorrespondenceEmailStatus;
 use App\Enums\CorrespondenceParty;
+use App\Enums\CorrespondenceType;
+use App\Enums\RoleName;
 use App\Models\Application;
+use App\Models\CorrespondenceConversation;
 use App\Models\CorrespondenceMessage;
+use App\Support\Correspondence\CorrespondenceInbox;
 use Flux\Flux;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -25,11 +29,20 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 /**
- * An application's staff correspondence as one timeline: forwards,
- * replies, remarks and logged Registrar replies, with email status and
- * "Seen". Opening it (and each 30-second refresh) marks messages to the
- * viewer's role as seen. Embedded in the Admin Officer's, Super Admin's
- * (read-only) and HOD/Dean's application views; never in a student view.
+ * The "Conversations" panel of an application: the viewer's own private
+ * staff conversations (list on the left, the selected chat on the right;
+ * separate screens on mobile). Only conversations the viewer takes part
+ * in are ever loaded, so another pair's messages cannot be reached even
+ * by changing ids in a Livewire payload. Opening a conversation marks
+ * messages to the viewer's role as seen. Embedded in the Admin Officer's
+ * and the HOD/Dean's application views; never in a student's or the
+ * Super Admin's.
+ *
+ * @property-read Collection<int, CorrespondenceConversation> $conversations
+ * @property-read CorrespondenceConversation|null $selected
+ * @property-read Collection<int, CorrespondenceMessage> $messages
+ * @property-read array<int, array<mixed>|string> $forwardStatusLines
+ * @property-read string|null $gmailNotice
  */
 class Thread extends Component
 {
@@ -40,7 +53,13 @@ class Thread extends Component
     #[Locked]
     public Application $application;
 
-    public string $reply_to = '';
+    #[Locked]
+    public ?int $selectedId = null;
+
+    /**
+     * On small screens: the chat instead of the conversation list.
+     */
+    public bool $showChat = false;
 
     public string $reply_body = '';
 
@@ -74,10 +93,43 @@ class Thread extends Component
         $this->reply_key = (string) Str::uuid();
         $this->external_key = (string) Str::uuid();
 
-        $targets = $this->replyTargets();
-        $this->reply_to = count($targets) === 1 ? $targets[0]->value : '';
+        $requested = request()->integer('conversation');
+        $conversations = $this->conversations;
+
+        $this->showChat = $requested > 0 && $conversations->contains('id', $requested);
+        $this->selectedId = $this->showChat
+            ? $requested
+            : ($conversations->sortByDesc('unread_count')->first() ?? $conversations->first())?->id;
 
         $this->markSeen();
+    }
+
+    /**
+     * The viewer's own conversations on this application, newest
+     * activity first.
+     *
+     * @return Collection<int, CorrespondenceConversation>
+     */
+    #[Computed]
+    public function conversations(): Collection
+    {
+        $user = Auth::user();
+        $party = CorrespondenceParty::forRole($user->staffRole());
+
+        return CorrespondenceConversation::query()
+            ->visibleTo($user)
+            ->where('application_id', $this->application->id)
+            ->with('latestMessage')
+            ->withCount(['messages as unread_count' => fn (Builder $query) => CorrespondenceInbox::constrainToUnread($query, $party, $user)])
+            ->withMax('messages as latest_message_id', 'id')
+            ->orderByDesc('latest_message_id')
+            ->get();
+    }
+
+    #[Computed]
+    public function selected(): ?CorrespondenceConversation
+    {
+        return $this->conversations->firstWhere('id', $this->selectedId);
     }
 
     /**
@@ -86,26 +138,41 @@ class Thread extends Component
     #[Computed]
     public function messages(): Collection
     {
-        return $this->application->correspondence()
-            ->with(['sender', 'recipient', 'author', 'seenBy', 'attachments'])
+        if ($this->selected === null) {
+            return new Collection;
+        }
+
+        return $this->selected->messages()
+            ->with(['sender', 'recipient', 'author', 'attachments'])
             ->orderBy('id')
             ->get();
     }
 
     /**
-     * Who this user may reply to on this application right now.
+     * What the Admin Officer may know about forwards between others,
+     * without any content: "HOD forwarded this to the Dean on 27 Oct".
      *
-     * @return list<CorrespondenceParty>
+     * @return array<int, array<mixed>|string>
      */
     #[Computed]
-    public function replyTargets(): array
+    public function forwardStatusLines(): array
     {
-        $user = Auth::user();
+        if (Auth::user()->staffRole() !== RoleName::AdminOfficer) {
+            return [];
+        }
 
-        return array_values(array_filter(
-            [CorrespondenceParty::AdminOfficer, CorrespondenceParty::Hod, CorrespondenceParty::Dean],
-            fn (CorrespondenceParty $party) => $user->can('reply', [$this->application, $party]),
-        ));
+        return CorrespondenceMessage::query()
+            ->where('application_id', $this->application->id)
+            ->where('type', CorrespondenceType::Forward)
+            ->where('from_party', '!=', CorrespondenceParty::AdminOfficer)
+            ->orderBy('id')
+            ->get(['from_party', 'to_party', 'created_at'])
+            ->map(fn (CorrespondenceMessage $forward) => __(':from forwarded this to the :to on :date', [
+                'from' => $forward->from_party->label(),
+                'to' => $forward->to_party->label(),
+                'date' => $forward->created_at->format('j M'),
+            ]))
+            ->all();
     }
 
     /**
@@ -116,9 +183,8 @@ class Thread extends Component
     public function gmailNotice(): ?string
     {
         $user = Auth::user();
-        $canWrite = $this->replyTargets() !== []
-            || $user->can('remark', $this->application)
-            || $user->can('logExternalReply', $this->application);
+        $canWrite = $this->selected !== null
+            && ($user->can('reply', $this->selected) || $user->can('logExternalReply', $this->selected));
 
         if (! $canWrite || $user->hasConnectedGmail()) {
             return null;
@@ -129,6 +195,24 @@ class Thread extends Component
             : __('Connect your Gmail. Your messages are saved in the portal and will be emailed from your own Gmail automatically once you connect it.');
     }
 
+    public function selectConversation(int $conversationId): void
+    {
+        $conversation = $this->conversations->firstWhere('id', $conversationId);
+
+        abort_if($conversation === null, 404);
+        $this->authorize('view', $conversation);
+
+        $this->selectedId = $conversation->id;
+        $this->showChat = true;
+        $this->reset('reply_body', 'reply_attachments');
+        $this->refreshThread();
+    }
+
+    public function backToList(): void
+    {
+        $this->showChat = false;
+    }
+
     /**
      * Polled every 30 seconds, and called after a forward or remark is
      * posted elsewhere on the page.
@@ -136,8 +220,15 @@ class Thread extends Component
     #[On('correspondence-posted')]
     public function refreshThread(): void
     {
+        $this->forgetComputed();
+
+        if ($this->selectedId === null && $this->conversations->isNotEmpty()) {
+            $this->selectedId = $this->conversations->first()->id;
+            unset($this->selected);
+        }
+
         $this->markSeen();
-        unset($this->messages, $this->replyTargets, $this->gmailNotice);
+        $this->forgetComputed();
     }
 
     public function removeReplyAttachment(int $index): void
@@ -154,22 +245,20 @@ class Thread extends Component
 
     public function reply(ReplyToCorrespondence $replyToCorrespondence): void
     {
+        $conversation = $this->selected;
+
+        abort_if($conversation === null, 404);
+        $this->authorize('reply', $conversation);
+
         $validated = $this->validateWithFiles('reply_attachments', [
-            'reply_to' => ['required', Rule::enum(CorrespondenceParty::class)],
             'reply_body' => ['required', 'string', 'max:'.self::BODY_MAX_LENGTH],
         ], [
-            'reply_to.required' => __('Choose who you are replying to.'),
-            'reply_body.required' => __('Write your reply.'),
+            'reply_body.required' => __('Write your message.'),
         ]);
 
-        $recipient = CorrespondenceParty::from($validated['reply_to']);
-
-        $this->authorize('reply', [$this->application, $recipient]);
-
         $message = $replyToCorrespondence->handle(
-            $this->application,
+            $conversation,
             Auth::user(),
-            $recipient,
             $validated['reply_body'],
             $this->reply_key,
             $this->reply_attachments,
@@ -179,12 +268,15 @@ class Thread extends Component
         $this->reply_key = (string) Str::uuid();
         $this->refreshThread();
 
-        Flux::toast(variant: 'success', text: $this->postedToast($message, __('Reply sent to the :party.', ['party' => $recipient->label()])));
+        Flux::toast(variant: 'success', text: $this->postedToast($message, __('Message sent.')));
     }
 
     public function logExternalReply(LogExternalReply $logExternalReply): void
     {
-        $this->authorize('logExternalReply', $this->application);
+        $conversation = $this->selected;
+
+        abort_if($conversation === null, 404);
+        $this->authorize('logExternalReply', $conversation);
 
         $validated = $this->validateWithFiles('external_attachments', [
             'external_body' => ['required', 'string', 'max:'.self::BODY_MAX_LENGTH],
@@ -192,7 +284,7 @@ class Thread extends Component
             'external_body.required' => __('Paste or summarize the Registrar\'s reply.'),
         ]);
 
-        $logExternalReply->handle($this->application, Auth::user(), $validated['external_body'], $this->external_key, $this->external_attachments);
+        $logExternalReply->handle($conversation, Auth::user(), $validated['external_body'], $this->external_key, $this->external_attachments);
 
         $this->reset('external_body', 'external_attachments');
         $this->external_key = (string) Str::uuid();
@@ -204,7 +296,10 @@ class Thread extends Component
 
     public function retryEmail(int $messageId, QueueCorrespondenceEmail $queueCorrespondenceEmail): void
     {
-        $message = $this->application->correspondence()->findOrFail($messageId);
+        $message = CorrespondenceMessage::query()
+            ->visibleTo(Auth::user())
+            ->where('application_id', $this->application->id)
+            ->findOrFail($messageId);
 
         $this->authorize('retryEmail', $message);
 
@@ -225,23 +320,25 @@ class Thread extends Component
         return view('livewire.correspondence.thread');
     }
 
+    private function forgetComputed(): void
+    {
+        unset($this->conversations, $this->selected, $this->messages, $this->forwardStatusLines, $this->gmailNotice);
+    }
+
     /**
-     * Messages addressed to the viewer's role that they did not send
-     * themselves become "Seen" the first time it is opened.
+     * Messages in the open conversation addressed to the viewer's role
+     * that they did not send themselves become "Seen".
      */
     private function markSeen(): void
     {
         $user = Auth::user();
         $party = CorrespondenceParty::forRole($user->staffRole());
 
-        if ($party === null) {
+        if ($party === null || $this->selected === null) {
             return;
         }
 
-        $this->application->correspondence()
-            ->where('to_party', $party)
-            ->whereNull('seen_at')
-            ->where(fn ($query) => $query->whereNull('from_user_id')->orWhere('from_user_id', '!=', $user->id))
+        CorrespondenceInbox::constrainToUnread(CorrespondenceMessage::query()->where('conversation_id', $this->selected->id), $party, $user)
             ->update(['seen_at' => now(), 'seen_by_id' => $user->id]);
     }
 

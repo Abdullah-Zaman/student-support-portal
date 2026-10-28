@@ -12,8 +12,9 @@ use App\Models\User;
 
 /**
  * Records an HOD's or Dean's remark (Recommended / Not recommended /
- * Comment) as a message to the Admin Officer in the correspondence
- * thread. The caller authorizes first. Remarks never reach the student.
+ * Comment) as a message to the Admin Officer in their private
+ * conversation. The caller authorizes first. Remarks never reach the
+ * student or anyone outside that conversation.
  */
 class AddRemark
 {

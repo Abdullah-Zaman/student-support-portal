@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\Correspondence\ReplyToCorrespondence;
-use App\Enums\CorrespondenceParty;
 use App\Enums\ForwardTarget;
 use App\Livewire\Admin\Applications\Index as AdminApplicationsIndex;
 use App\Livewire\Correspondence\Inbox;
@@ -35,7 +34,7 @@ test('a new message is unread for the recipient until they open the thread, then
 
     Livewire::actingAs($admin)
         ->test(Thread::class, ['application' => $application])
-        ->assertSee('Seen '.$forward->seen_at->format('j M, g:i A'));
+        ->assertSeeHtml('data-test="seen-'.$forward->id.'"');
 });
 
 test('the sender opening the thread does not mark their own message as seen', function () {
@@ -48,7 +47,7 @@ test('the sender opening the thread does not mark their own message as seen', fu
 
     Livewire::actingAs($admin)
         ->test(Thread::class, ['application' => $application])
-        ->assertSee('Not seen yet');
+        ->assertDontSeeHtml('data-test="seen-'.$forward->id.'"');
 
     expect($forward->refresh()->seen_at)->toBeNull();
 });
@@ -65,8 +64,8 @@ test('the inbox lists unread threads first and filters by unread, awaiting my re
 
     $hodReplied = createApplicationInDepartment($department, $student);
     $hodReplied->update(['subject' => 'HOD answered']);
-    recordForward($hodReplied, ForwardTarget::Hod, $admin, 'Please advise.', $hod);
-    app(ReplyToCorrespondence::class)->handle($hodReplied, $hod, CorrespondenceParty::AdminOfficer, 'Approved.', 'reply-key');
+    $forward = recordForward($hodReplied, ForwardTarget::Hod, $admin, 'Please advise.', $hod);
+    app(ReplyToCorrespondence::class)->handle($forward->conversation, $hod, 'Approved.', 'reply-key');
 
     $notForwarded = createApplicationInDepartment($department, $student);
     $notForwarded->update(['subject' => 'Never forwarded']);
@@ -88,8 +87,8 @@ test('the sidebar shows the unread count, and the Super Admin and students have 
     $admin = createAdminOfficer($department);
     $hod = createHod($department);
     $application = createApplicationInDepartment($department, createStudentUser($department));
-    recordForward($application, ForwardTarget::Hod, $admin, 'Please advise.', $hod);
-    app(ReplyToCorrespondence::class)->handle($application, $hod, CorrespondenceParty::AdminOfficer, 'Approved.', 'reply-key');
+    $forward = recordForward($application, ForwardTarget::Hod, $admin, 'Please advise.', $hod);
+    app(ReplyToCorrespondence::class)->handle($forward->conversation, $hod, 'Approved.', 'reply-key');
 
     $this->actingAs($admin)->get(route('admin.dashboard'))
         ->assertOk()
@@ -120,8 +119,8 @@ test('the applications list shows where the Admin Officer\'s correspondence stan
     $waiting = createApplicationInDepartment($department, $student);
     recordForward($waiting, ForwardTarget::Hod, $admin, 'Please advise.', $hod);
     $answered = createApplicationInDepartment($department, $student);
-    recordForward($answered, ForwardTarget::Hod, $admin, 'Please advise.', $hod);
-    app(ReplyToCorrespondence::class)->handle($answered, $hod, CorrespondenceParty::AdminOfficer, 'Approved.', 'reply-key');
+    $forward = recordForward($answered, ForwardTarget::Hod, $admin, 'Please advise.', $hod);
+    app(ReplyToCorrespondence::class)->handle($forward->conversation, $hod, 'Approved.', 'reply-key');
 
     Livewire::actingAs($admin)
         ->test(AdminApplicationsIndex::class)

@@ -11,6 +11,7 @@ use App\Enums\ForwardTarget;
 use App\Livewire\Correspondence\Thread;
 use App\Models\Application;
 use App\Models\CorrespondenceAttachment;
+use App\Models\CorrespondenceConversation;
 use App\Models\CorrespondenceMessage;
 use App\Models\Department;
 use App\Models\Faculty;
@@ -62,49 +63,29 @@ function sentGmailRequests(): array
         ->all();
 }
 
-test('only allowed reply pairs between parties already in the thread are permitted', function (string $sender, CorrespondenceParty $recipient, bool $deanInChain, bool $allowed) {
-    ['admin' => $admin, 'hod' => $hod, 'dean' => $dean, 'application' => $application] = correspondenceChain();
-
-    if ($deanInChain) {
-        recordForward($application, ForwardTarget::Dean, $hod, 'For your approval.', $dean);
-    }
-
-    $user = ['admin' => $admin, 'hod' => $hod, 'dean' => $dean, 'super admin' => createSuperAdmin()][$sender];
-
-    expect($user->can('reply', [$application, $recipient]))->toBe($allowed);
-})->with([
-    'admin to HOD' => ['admin', CorrespondenceParty::Hod, false, true],
-    'HOD to admin' => ['hod', CorrespondenceParty::AdminOfficer, false, true],
-    'admin to Dean not in chain' => ['admin', CorrespondenceParty::Dean, false, false],
-    'admin to Dean in chain' => ['admin', CorrespondenceParty::Dean, true, true],
-    'HOD to Dean not in chain' => ['hod', CorrespondenceParty::Dean, false, false],
-    'HOD to Dean in chain' => ['hod', CorrespondenceParty::Dean, true, true],
-    'Dean to HOD in chain' => ['dean', CorrespondenceParty::Hod, true, true],
-    'Dean to admin in chain' => ['dean', CorrespondenceParty::AdminOfficer, true, true],
-    'Dean not in chain to admin' => ['dean', CorrespondenceParty::AdminOfficer, false, false],
-    'admin to admin' => ['admin', CorrespondenceParty::AdminOfficer, false, false],
-    'HOD to Registrar' => ['hod', CorrespondenceParty::Registrar, false, false],
-    'super admin to HOD' => ['super admin', CorrespondenceParty::Hod, false, false],
-]);
-
 test('nobody can reply on a closed or rejected application', function (ApplicationStatus $status) {
     ['admin' => $admin, 'application' => $application] = correspondenceChain();
     $application->update(['status' => $status]);
 
-    expect($admin->can('reply', [$application, CorrespondenceParty::Hod]))->toBeFalse();
+    expect($admin->can('reply', $application->conversations()->sole()))->toBeFalse();
 })->with([ApplicationStatus::Closed, ApplicationStatus::Rejected]);
 
-test('an illegal reply pair is rejected by the thread and nothing is recorded', function () {
-    ['hod' => $hod, 'application' => $application] = correspondenceChain();
+test('a conversation of someone else cannot be opened by changing its id', function () {
+    ['admin' => $admin, 'hod' => $hod, 'dean' => $dean, 'application' => $application] = correspondenceChain();
+    $deanConversation = CorrespondenceConversation::between($application->id, CorrespondenceParty::AdminOfficer, CorrespondenceParty::Dean);
+    CorrespondenceMessage::factory()->create([
+        'application_id' => $application->id,
+        'author_id' => $admin->id,
+        'to_party' => CorrespondenceParty::Dean,
+        'to_user_id' => $dean->id,
+        'body' => 'Secret for the Dean.',
+    ]);
 
     Livewire::actingAs($hod)
         ->test(Thread::class, ['application' => $application])
-        ->set('reply_to', CorrespondenceParty::Dean->value)
-        ->set('reply_body', 'Skipping ahead to the Dean.')
-        ->call('reply')
-        ->assertForbidden();
-
-    expect(CorrespondenceMessage::query()->where('type', CorrespondenceType::Reply)->count())->toBe(0);
+        ->assertDontSee('Secret for the Dean.')
+        ->call('selectConversation', $deanConversation->id)
+        ->assertNotFound();
 });
 
 test('students, outsiders and other departments cannot view the thread', function (string $viewer) {
@@ -125,19 +106,11 @@ test('students, outsiders and other departments cannot view the thread', functio
         ->assertForbidden();
 })->with(['student', 'other admin officer', 'other HOD', 'Dean not in chain']);
 
-test('the Super Admin reads every thread but cannot post', function () {
+test('the Super Admin cannot open the conversations panel', function () {
     ['application' => $application] = correspondenceChain();
-    $superAdmin = createSuperAdmin();
 
-    Livewire::actingAs($superAdmin)
+    Livewire::actingAs(createSuperAdmin())
         ->test(Thread::class, ['application' => $application])
-        ->assertOk()
-        ->assertSee('Please advise.')
-        ->assertDontSee('Send reply')
-        ->assertDontSee('Log external reply')
-        ->set('reply_to', CorrespondenceParty::Hod->value)
-        ->set('reply_body', 'Super Admin reply')
-        ->call('reply')
         ->assertForbidden();
 });
 
@@ -150,7 +123,6 @@ test('an HOD replies with an attachment from their own Gmail and the Admin Offic
 
     Livewire::actingAs($hod)
         ->test(Thread::class, ['application' => $application])
-        ->assertSet('reply_to', CorrespondenceParty::AdminOfficer->value)
         ->set('reply_body', 'Has the student cleared earlier dues?')
         ->set('reply_attachments', [UploadedFile::fake()->create('ledger.pdf', 100, 'application/pdf')])
         ->call('reply')
@@ -191,13 +163,15 @@ test('every email of a thread carries the same subject and threading headers, an
     connectGmail($hod);
 
     $forward = app(ForwardApplication::class)->handle($application, $admin, ForwardTarget::Hod, 'Please advise.', 'forward-key');
-    $hodReply = app(ReplyToCorrespondence::class)->handle($application, $hod, CorrespondenceParty::AdminOfficer, 'Dues cleared?', 'hod-reply-key');
-    $adminReply = app(ReplyToCorrespondence::class)->handle($application, $admin, CorrespondenceParty::Hod, 'Yes, all cleared.', 'admin-reply-key');
+    $hodReply = app(ReplyToCorrespondence::class)->handle($forward->conversation, $hod, 'Dues cleared?', 'hod-reply-key');
+    $adminReply = app(ReplyToCorrespondence::class)->handle($forward->conversation, $admin, 'Yes, all cleared.', 'admin-reply-key');
 
     [$forwardMail, $hodMail, $adminMail] = sentGmailRequests();
 
-    foreach ([$forwardMail, $hodMail, $adminMail] as $mail) {
-        expect($mail)->toContain('Subject: [SC-2026-000124] Fee instalment request');
+    expect($forwardMail)->toContain('Subject: Fwd: Fee instalment request (SC-2026-000124)');
+
+    foreach ([$hodMail, $adminMail] as $mail) {
+        expect($mail)->toContain('Subject: Re: Fee instalment request (SC-2026-000124)');
     }
 
     expect($forwardMail)->toContain("Message-ID: <{$forward->rfc_message_id}>")
@@ -229,8 +203,8 @@ test('a reply in a thread Gmail no longer knows is sent as a new thread', functi
     $application = createApplicationInDepartment($department, createStudentUser($department));
     connectGmail($admin);
 
-    app(ForwardApplication::class)->handle($application, $admin, ForwardTarget::Hod, 'Please advise.', 'forward-key');
-    $reply = app(ReplyToCorrespondence::class)->handle($application, $admin, CorrespondenceParty::Hod, 'Any update?', 'reply-key');
+    $forward = app(ForwardApplication::class)->handle($application, $admin, ForwardTarget::Hod, 'Please advise.', 'forward-key');
+    $reply = app(ReplyToCorrespondence::class)->handle($forward->conversation, $admin, 'Any update?', 'reply-key');
 
     expect($reply->refresh()->email_status)->toBe(CorrespondenceEmailStatus::Sent)
         ->and($reply->gmail_thread_id)->toBe('gmail-thread-3');
@@ -242,8 +216,9 @@ test('a double-submitted reply is recorded and emailed once', function () {
     connectGmail($hod);
     $replyToCorrespondence = app(ReplyToCorrespondence::class);
 
-    $first = $replyToCorrespondence->handle($application, $hod, CorrespondenceParty::AdminOfficer, 'Recommended.', 'same-key');
-    $second = $replyToCorrespondence->handle($application, $hod, CorrespondenceParty::AdminOfficer, 'Recommended.', 'same-key');
+    $conversation = $application->conversations()->sole();
+    $first = $replyToCorrespondence->handle($conversation, $hod, 'Recommended.', 'same-key');
+    $second = $replyToCorrespondence->handle($conversation, $hod, 'Recommended.', 'same-key');
 
     expect($second->is($first))->toBeTrue()
         ->and(CorrespondenceMessage::query()->where('type', CorrespondenceType::Reply)->count())->toBe(1)
@@ -265,45 +240,46 @@ test('a double-clicked retry sends the email once', function () {
         ->and($message->refresh()->email_status)->toBe(CorrespondenceEmailStatus::Sent);
 });
 
-test('the Admin Officer logs the Registrar\'s emailed reply, addressed to whoever forwarded to the Registrar', function () {
+test('the HOD logs the Registrar\'s emailed reply in their private conversation with the Registrar', function () {
     Http::preventStrayRequests();
-    Notification::fake();
     ['admin' => $admin, 'hod' => $hod, 'application' => $application] = correspondenceChain();
     recordForward($application, ForwardTarget::Registrar, $hod, 'Please process the instalment.');
+    $registrarConversation = CorrespondenceConversation::between($application->id, CorrespondenceParty::Hod, CorrespondenceParty::Registrar);
 
-    Livewire::actingAs($admin)
+    Livewire::actingAs($hod)
         ->test(Thread::class, ['application' => $application])
+        ->call('selectConversation', $registrarConversation->id)
         ->assertSee('Log external reply')
         ->set('external_body', 'Approved. Two instalments allowed.')
         ->call('logExternalReply')
         ->assertHasNoErrors()
-        ->assertSee('Logged by '.$admin->name);
+        ->assertSee('Logged by '.$hod->name);
 
     $logged = CorrespondenceMessage::query()->where('type', CorrespondenceType::LoggedReply)->sole();
-    expect($logged->from_party)->toBe(CorrespondenceParty::Registrar)
-        ->and($logged->from_user_id)->toBeNull()
+    expect($logged->conversation_id)->toBe($registrarConversation->id)
+        ->and($logged->from_party)->toBe(CorrespondenceParty::Registrar)
         ->and($logged->from_email)->toBe('registrar@superior.edu.pk')
-        ->and($logged->author_id)->toBe($admin->id)
         ->and($logged->to_party)->toBe(CorrespondenceParty::Hod)
         ->and($logged->to_user_id)->toBe($hod->id)
         ->and($logged->email_status)->toBe(CorrespondenceEmailStatus::NotEmailed);
 
     Http::assertNothingSent();
-    Notification::assertSentTo($hod, CorrespondenceReceived::class);
+    expect($admin->can('view', $registrarConversation))->toBeFalse();
 });
 
-test('a Registrar reply can only be logged by the Admin Officer and only after a Registrar forward', function () {
+test('a Registrar reply can only be logged by the HOD or Dean of that conversation, after a Registrar forward', function () {
     ['admin' => $admin, 'hod' => $hod, 'application' => $application] = correspondenceChain();
+    $registrarConversation = CorrespondenceConversation::between($application->id, CorrespondenceParty::Hod, CorrespondenceParty::Registrar);
 
-    expect($admin->can('logExternalReply', $application))->toBeFalse();
+    expect($hod->can('logExternalReply', $registrarConversation))->toBeFalse();
 
     recordForward($application, ForwardTarget::Registrar, $hod);
 
-    expect($admin->can('logExternalReply', $application))->toBeTrue()
-        ->and($hod->can('logExternalReply', $application))->toBeFalse()
-        ->and(createSuperAdmin()->can('logExternalReply', $application))->toBeFalse();
+    expect($hod->can('logExternalReply', $registrarConversation))->toBeTrue()
+        ->and($admin->can('logExternalReply', $registrarConversation))->toBeFalse()
+        ->and(createSuperAdmin()->can('logExternalReply', $registrarConversation))->toBeFalse();
 
-    Livewire::actingAs($hod)
+    Livewire::actingAs($admin)
         ->test(Thread::class, ['application' => $application])
         ->set('external_body', 'Made-up registrar reply')
         ->call('logExternalReply')
@@ -312,7 +288,7 @@ test('a Registrar reply can only be logged by the Admin Officer and only after a
 
 test('correspondence attachments are served only to people who can view the thread', function () {
     Storage::fake('local');
-    ['admin' => $admin, 'hod' => $hod, 'application' => $application] = correspondenceChain();
+    ['admin' => $admin, 'hod' => $hod, 'dean' => $dean, 'application' => $application] = correspondenceChain();
     $message = $application->correspondence()->sole();
     Storage::disk('local')->put('correspondence/abc123.pdf', '%PDF-1.4');
     $attachment = CorrespondenceAttachment::create([
@@ -328,6 +304,8 @@ test('correspondence attachments are served only to people who can view the thre
     $this->actingAs($hod)->get(route('correspondence.attachments.show', $attachment))->assertOk()->assertDownload('minutes.pdf');
     $this->actingAs($application->student->user)->get(route('correspondence.attachments.show', $attachment))->assertForbidden();
     $this->actingAs(createHod())->get(route('correspondence.attachments.show', $attachment))->assertForbidden();
+    $this->actingAs($dean)->get(route('correspondence.attachments.show', $attachment))->assertForbidden();
+    $this->actingAs(createSuperAdmin())->get(route('correspondence.attachments.show', $attachment))->assertForbidden();
 });
 
 test('message text is escaped in the thread', function () {

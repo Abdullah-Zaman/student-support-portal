@@ -20,7 +20,7 @@ use Throwable;
  * Emails one correspondence message from the sender's own Gmail and
  * records the outcome on it. Only a message in "sending" is sent, and
  * only one job per message runs at a time, so it never goes out twice.
- * The sender's earlier Gmail thread for this application is reused so
+ * The sender's earlier Gmail thread for this conversation is reused so
  * their Sent folder keeps one conversation. Temporary Gmail trouble is
  * retried; a lost Gmail connection puts the message back to "pending:
  * connect Gmail"; anything else fails with a reason the sender can retry.
@@ -96,14 +96,14 @@ class SendCorrespondenceEmail implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Join the sender's earlier Gmail thread for this application. If
+     * Join the sender's earlier Gmail thread for this conversation. If
      * Gmail no longer knows that thread (the sender deleted it), send
      * without it rather than fail.
      */
     private function send(GmailSender $gmail, CorrespondenceEmailBuilder $builder, CorrespondenceMessage $message): GmailSentMessage
     {
         $threadId = CorrespondenceMessage::query()
-            ->where('application_id', $message->application_id)
+            ->where('conversation_id', $message->conversation_id)
             ->where('from_user_id', $message->from_user_id)
             ->whereNotNull('gmail_thread_id')
             ->where('id', '<', $message->id)

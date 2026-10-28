@@ -30,12 +30,13 @@ use Spatie\Permission\Traits\HasRoles;
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property UserStatus $status
+ * @property string|null $email_signature
  * @property Carbon|null $last_login_at
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'department_id', 'faculty_id', 'status', 'email_verified_at'])]
+#[Fillable(['name', 'email', 'password', 'department_id', 'faculty_id', 'status', 'email_verified_at', 'email_signature'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -100,6 +101,31 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isReviewer(): bool
     {
         return $this->hasAnyRole([RoleName::Hod->value, RoleName::Dean->value]);
+    }
+
+    /**
+     * The signature at the end of the staff member's correspondence
+     * emails: the one they saved in their profile, or one generated from
+     * their profile (name, designation, department, university).
+     */
+    public function emailSignature(): string
+    {
+        $saved = trim((string) $this->email_signature);
+
+        if ($saved !== '') {
+            return $saved;
+        }
+
+        $designation = match ($this->staffRole()) {
+            RoleName::AdminOfficer => 'Admin Officer',
+            RoleName::Hod => 'Head of Department',
+            RoleName::Dean => 'Dean',
+            default => null,
+        };
+        $unit = $this->staffRole() === RoleName::Dean ? $this->faculty?->name : $this->department?->name;
+
+        return collect([$this->name, $designation, $unit, 'Superior University'])->filter()->implode('
+');
     }
 
     /**

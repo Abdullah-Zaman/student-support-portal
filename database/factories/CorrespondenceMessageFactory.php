@@ -6,6 +6,7 @@ use App\Enums\CorrespondenceEmailStatus;
 use App\Enums\CorrespondenceParty;
 use App\Enums\CorrespondenceType;
 use App\Models\Application;
+use App\Models\CorrespondenceConversation;
 use App\Models\CorrespondenceMessage;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -34,6 +35,11 @@ class CorrespondenceMessageFactory extends Factory
             'from_user_id' => fn (array $attributes) => $attributes['author_id'],
             'to_party' => CorrespondenceParty::Hod,
             'to_user_id' => null,
+            'conversation_id' => fn (array $attributes) => CorrespondenceConversation::between(
+                $attributes['application_id'],
+                $attributes['from_party'],
+                $attributes['to_party'],
+            )->id,
             'body' => fake()->sentence(),
             'email_status' => CorrespondenceEmailStatus::Sent,
             'rfc_message_id' => 'corr.'.Str::random(20).'@example.test',

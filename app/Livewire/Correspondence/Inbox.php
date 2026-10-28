@@ -4,8 +4,7 @@ namespace App\Livewire\Correspondence;
 
 use App\Enums\CorrespondenceParty;
 use App\Enums\RoleName;
-use App\Models\Application;
-use App\Models\CorrespondenceMessage;
+use App\Models\CorrespondenceConversation;
 use App\Support\Correspondence\CorrespondenceInbox;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
@@ -18,9 +17,9 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 /**
- * The staff correspondence inbox for the Admin Officer, HOD and Dean:
- * applications whose correspondence involves them, unread first, with
- * Unread / Awaiting my reply / Awaiting their reply filters.
+ * The staff inbox for the Admin Officer, HOD and Dean: their own private
+ * conversations (not applications), unread first, with Unread / Awaiting
+ * my reply / Awaiting their reply filters. The Super Admin has none.
  */
 #[Title('Inbox')]
 class Inbox extends Component
@@ -43,45 +42,36 @@ class Inbox extends Component
     }
 
     /**
-     * @return LengthAwarePaginator<int, Application>
+     * @return LengthAwarePaginator<int, CorrespondenceConversation>
      */
     #[Computed]
-    public function applications(): LengthAwarePaginator
+    public function conversations(): LengthAwarePaginator
     {
         $user = Auth::user();
         $party = $this->party();
-        $inbox = app(CorrespondenceInbox::class);
-        $unread = fn (Builder $query) => $query
-            ->where('to_party', $party)
-            ->whereNull('seen_at')
-            ->where(fn (Builder $query) => $query->whereNull('from_user_id')->orWhere('from_user_id', '!=', $user->id));
+        $unread = fn (Builder $query) => CorrespondenceInbox::constrainToUnread($query, $party, $user);
 
-        $query = $inbox->applications($user)
-            ->with(['student.user', 'latestCorrespondence.sender'])
-            ->withCount(['correspondence as unread_count' => $unread])
-            ->withMax('correspondence as latest_correspondence_id', 'id');
+        $query = app(CorrespondenceInbox::class)->conversations($user)
+            ->with(['application.student.user', 'latestMessage.sender'])
+            ->withCount(['messages as unread_count' => $unread])
+            ->withMax('messages as latest_message_id', 'id');
 
         $query = match ($this->filter) {
-            'unread' => $query->whereHas('correspondence', $unread),
-            'awaiting_me' => $inbox->whereAwaiting($query, $party, awaitingParty: true),
-            'awaiting_them' => $inbox->whereAwaiting($query, $party, awaitingParty: false),
+            'unread' => $query->whereHas('messages', $unread),
+            'awaiting_me' => $query->whereHas('latestMessage', fn (Builder $latest) => $latest->where('to_party', $party)),
+            'awaiting_them' => $query->whereHas('latestMessage', fn (Builder $latest) => $latest->where('from_party', $party)),
             default => $query,
         };
 
         return $query
             ->orderByDesc('unread_count')
-            ->orderByDesc('latest_correspondence_id')
+            ->orderByDesc('latest_message_id')
             ->paginate(15);
     }
 
-    public function applicationUrl(Application $application): string
+    public function conversationUrl(CorrespondenceConversation $conversation): string
     {
-        return route((string) $this->party()?->applicationRouteName(), $application).'#correspondence';
-    }
-
-    public function isFromMe(?CorrespondenceMessage $message): bool
-    {
-        return $message !== null && $message->from_party === $this->party();
+        return route((string) $this->party()?->applicationRouteName(), $conversation->application).'?conversation='.$conversation->id.'#correspondence';
     }
 
     public function render(): View

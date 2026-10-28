@@ -8,6 +8,7 @@ use App\Enums\CorrespondenceType;
 use App\Enums\RemarkType;
 use App\Jobs\SendCorrespondenceEmail;
 use App\Models\Application;
+use App\Models\CorrespondenceConversation;
 use App\Models\CorrespondenceMessage;
 use App\Models\User;
 use App\Notifications\CorrespondenceReceived;
@@ -21,7 +22,8 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Records one message in an application's correspondence thread, stores
+ * Records one message in the private conversation between its two
+ * parties on an application (started by the first message), stores
  * its files, notifies the recipient and queues the email from the
  * sender's own Gmail. The caller authorizes first.
  *
@@ -56,6 +58,7 @@ class PostCorrespondence
                 $message = CorrespondenceMessage::create([
                     ...$attributes,
                     'application_id' => $application->id,
+                    'conversation_id' => CorrespondenceConversation::between($application->id, $attributes['from_party'], $attributes['to_party'])->id,
                     'author_id' => $author->id,
                     'body' => $this->clean($attributes['body']),
                     'email_status' => $this->initialEmailStatus($attributes['type'], $author),
