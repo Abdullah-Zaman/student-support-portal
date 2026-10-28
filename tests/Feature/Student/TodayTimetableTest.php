@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Student\Profile;
 use App\Models\Department;
 use App\Models\TimetableClass;
 use App\Models\TimetableVersion;
@@ -84,4 +85,59 @@ test('the today card says there are no classes on a free day', function () {
     $this->actingAs($student)
         ->get(route('student.dashboard'))
         ->assertSee('No classes today.');
+});
+
+test('the today card has three separate states: no section, section with no classes today, classes today', function () {
+    $student = studentWithMondayClasses();
+    $student->student->update(['section' => null]);
+
+    $this->travelTo(Carbon::parse('2026-10-28 09:00:00', 'Asia/Karachi'));
+    $this->actingAs($student)->get(route('student.dashboard'))
+        ->assertSee('data-test="today-state-no-section"', false)
+        ->assertDontSee('No classes today.');
+
+    $student->student->update(['section' => 'BSSE-5A']);
+    $this->get(route('student.dashboard'))
+        ->assertSee('data-test="today-state-no-classes"', false)
+        ->assertSee('No classes today.')
+        ->assertDontSee('data-test="today-state-no-section"', false);
+
+    $this->travelTo(Carbon::parse('2026-10-26 10:00:00', 'Asia/Karachi'));
+    $this->get(route('student.dashboard'))
+        ->assertSee('Operating Systems (Lab)')
+        ->assertDontSee('data-test="today-state-no-section"', false)
+        ->assertDontSee('No classes today.');
+});
+
+test('a section saved on the profile page shows "No classes today" on a free day, not the select-your-section prompt', function () {
+    $department = Department::factory()->create();
+    $student = createTimetableStudent($department, 'BSSE', 7);
+    $version = TimetableVersion::factory()->published()->create(['department_id' => $department->id]);
+    TimetableClass::factory()->forSections(['BSSE-7B'])->create(['timetable_version_id' => $version->id, 'day' => 6, 'course' => 'Saturday Seminar']);
+
+    $this->travelTo(Carbon::parse('2026-10-28 09:00:00', 'Asia/Karachi'));
+
+    Livewire\Livewire::actingAs($student)
+        ->test(Profile::class)
+        ->set('section', 'BSSE-7B')
+        ->call('updateSection')
+        ->assertHasNoErrors();
+
+    expect($student->student->refresh()->section)->toBe('BSSE-7B');
+
+    $this->actingAs($student)->get(route('student.dashboard'))
+        ->assertSee('data-test="today-state-no-classes"', false)
+        ->assertSee('No classes today.')
+        ->assertDontSee('Pick your section to see your classes here.');
+});
+
+test('the today card uses the Pakistan day even when UTC is still the previous day', function () {
+    $student = studentWithMondayClasses();
+
+    // 20:00 UTC on Sunday 25 Oct is already 01:00 on Monday 26 Oct in Lahore.
+    $this->travelTo(Carbon::parse('2026-10-25 20:00:00', 'UTC'));
+
+    $this->actingAs($student)->get(route('student.dashboard'))
+        ->assertSee('Operating Systems (Lab)')
+        ->assertSee('Monday');
 });

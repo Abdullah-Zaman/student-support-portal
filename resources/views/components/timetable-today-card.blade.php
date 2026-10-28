@@ -3,8 +3,9 @@
 ])
 
 @php
-    $today = $schedule->today();
-    $now = now();
+    $now = now(\App\Support\Timetable\StudentSchedule::TIMEZONE);
+    $today = $schedule->today($now);
+    $state = $schedule->todayState($now);
     $current = $today['current'];
     $next = $today['next'];
 
@@ -22,18 +23,18 @@
             <flux:link :href="route('student.timetable')" class="text-sm font-semibold" wire:navigate>{{ __('Full timetable') }}</flux:link>
         </x-slot:actions>
 
-        @if ($schedule->section === null)
-            <div class="flex flex-col items-start gap-3 px-[22px] py-5">
+        @if ($state === \App\Support\Timetable\StudentSchedule::STATE_NO_SECTION)
+            <div class="flex flex-col items-start gap-3 px-[22px] py-5" data-test="today-state-no-section">
                 <span class="text-sm text-ink-soft">{{ __('Pick your section to see your classes here.') }}</span>
                 <flux:button :href="route('student.profile')" variant="primary" size="sm" wire:navigate>{{ __('Choose section') }}</flux:button>
             </div>
-        @elseif ($schedule->sectionIsMissing())
-            <div class="flex flex-col items-start gap-3 px-[22px] py-5">
+        @elseif ($state === \App\Support\Timetable\StudentSchedule::STATE_SECTION_MISSING)
+            <div class="flex flex-col items-start gap-3 px-[22px] py-5" data-test="today-state-section-missing">
                 <span class="text-sm text-ink-soft">{{ __('Section :section is not in the current timetable. Pick your section again.', ['section' => $schedule->section]) }}</span>
                 <flux:button :href="route('student.profile')" variant="primary" size="sm" wire:navigate>{{ __('Choose section') }}</flux:button>
             </div>
-        @elseif ($today['classes']->isEmpty())
-            <div class="flex items-center gap-3 px-[22px] py-6">
+        @elseif ($state === \App\Support\Timetable\StudentSchedule::STATE_NO_CLASSES_TODAY)
+            <div class="flex items-center gap-3 px-[22px] py-6" data-test="today-state-no-classes">
                 <flux:icon icon="sun" class="size-6 text-subtle" />
                 <span class="text-sm font-semibold text-ink-soft">{{ __('No classes today.') }}</span>
             </div>

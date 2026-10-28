@@ -14,6 +14,16 @@ use Illuminate\Database\Eloquent\Collection;
  */
 final readonly class StudentSchedule
 {
+    public const TIMEZONE = 'Asia/Karachi';
+
+    public const STATE_NO_SECTION = 'no_section';
+
+    public const STATE_SECTION_MISSING = 'section_missing';
+
+    public const STATE_NO_CLASSES_TODAY = 'no_classes_today';
+
+    public const STATE_HAS_CLASSES_TODAY = 'has_classes_today';
+
     /**
      * @param  Collection<int, TimetableClass>  $classes
      */
@@ -45,6 +55,21 @@ final readonly class StudentSchedule
     }
 
     /**
+     * What the dashboard's "Today" card shows: no section chosen yet, a
+     * chosen section the published timetable does not have, a chosen
+     * section with no classes today, or classes today.
+     */
+    public function todayState(?CarbonInterface $now = null): string
+    {
+        return match (true) {
+            $this->section === null => self::STATE_NO_SECTION,
+            $this->sectionIsMissing() => self::STATE_SECTION_MISSING,
+            $this->today($now)['classes']->isEmpty() => self::STATE_NO_CLASSES_TODAY,
+            default => self::STATE_HAS_CLASSES_TODAY,
+        };
+    }
+
+    /**
      * @return Collection<int, TimetableClass>
      */
     public function classesOn(int $day): Collection
@@ -73,7 +98,7 @@ final readonly class StudentSchedule
      */
     public function today(?CarbonInterface $now = null): array
     {
-        $now ??= now();
+        $now ??= now(self::TIMEZONE);
         $classes = $this->classesOn($now->dayOfWeekIso);
 
         $current = $classes->first(fn (TimetableClass $class): bool => $class->startsOn($now)->lessThanOrEqualTo($now) && $class->endsOn($now)->greaterThan($now));
