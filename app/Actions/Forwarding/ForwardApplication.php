@@ -18,12 +18,14 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Records one forward of an application as a message in its
- * correspondence thread (who may forward where is the ApplicationPolicy's
- * job; the caller authorizes first). The status is left unchanged. The
- * HOD/Dean is notified, the student gets a short notice with no note, and
- * the Admin Officers are told when an HOD or Dean passes it on. The email
- * goes from the sender's own Gmail, or waits until they connect it.
+ * Records one forward of an application as a message in the private
+ * conversation between the sender and the recipient (who may forward
+ * where is the ApplicationPolicy's job; the caller authorizes first).
+ * The status is left unchanged. The recipient is notified, the student
+ * gets a short notice with no note (not when it goes back to the Admin
+ * Officer), and the Admin Officers get a neutral notice when others pass
+ * it on. The email goes from the sender's own Gmail, or waits until they
+ * connect it.
  */
 class ForwardApplication
 {
@@ -38,6 +40,7 @@ class ForwardApplication
     public function unavailableReason(Application $application, ForwardTarget $target): ?string
     {
         $isAvailable = match ($target) {
+            ForwardTarget::AdminOfficer => User::adminOfficersInDepartment($application->department_id)->isNotEmpty(),
             ForwardTarget::Hod => User::activeHodForDepartment($application->department_id) !== null,
             ForwardTarget::Dean => User::activeDeanForFaculty($application->department?->faculty_id) !== null,
             ForwardTarget::Registrar => self::registrarEmail() !== null,
@@ -48,6 +51,7 @@ class ForwardApplication
         }
 
         return match ($target) {
+            ForwardTarget::AdminOfficer => __('No Admin Officer for this department.'),
             ForwardTarget::Hod => __('No active HOD for this department.'),
             ForwardTarget::Dean => __('No active Dean for this faculty.'),
             ForwardTarget::Registrar => __('The Registrar email is not set. Ask the Super Admin to add it in Settings.'),
@@ -72,6 +76,11 @@ class ForwardApplication
         }
 
         $toParty = CorrespondenceParty::fromForwardTarget($target);
+
+        if (! $fromParty->canConverseWith($toParty)) {
+            throw ValidationException::withMessages(['forward_target' => __('You cannot forward an application to yourself.')]);
+        }
+
         $recipient = $this->post->recipientFor($application, $toParty, $fromParty);
 
         $forward = $this->post->handle($application, $sender, [
@@ -83,7 +92,7 @@ class ForwardApplication
             'to_email' => $target === ForwardTarget::Registrar ? self::registrarEmail() : null,
             'body' => $note,
         ], $idempotencyKey, alsoInTransaction: function (CorrespondenceMessage $forward) use ($application, $sender, $fromParty, $target) {
-            $application->update(['forwarded_to' => $target]);
+            $application->update(['forwarded_to' => $target === ForwardTarget::AdminOfficer ? null : $target]);
 
             ApplicationEvent::create([
                 'application_id' => $application->id,
@@ -91,7 +100,7 @@ class ForwardApplication
                 'event_type' => ApplicationEventType::Forwarded,
                 'from_value' => $fromParty->value,
                 'to_value' => $target->value,
-                'visible_to_student' => true,
+                'visible_to_student' => $target !== ForwardTarget::AdminOfficer,
             ]);
         });
 
@@ -99,9 +108,11 @@ class ForwardApplication
             return $forward;
         }
 
-        $application->student->user->notify(new ApplicationForwardedForReview($application, $target));
+        if ($target !== ForwardTarget::AdminOfficer) {
+            $application->student->user->notify(new ApplicationForwardedForReview($application, $target));
+        }
 
-        if ($fromParty !== CorrespondenceParty::AdminOfficer) {
+        if ($fromParty !== CorrespondenceParty::AdminOfficer && $target !== ForwardTarget::AdminOfficer) {
             Notification::send(User::adminOfficersInDepartment($application->department_id), new ApplicationForwardedOnward($application, $forward));
         }
 

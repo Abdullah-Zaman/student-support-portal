@@ -31,6 +31,7 @@ enum CorrespondenceParty: string
     public static function fromForwardTarget(ForwardTarget $target): self
     {
         return match ($target) {
+            ForwardTarget::AdminOfficer => self::AdminOfficer,
             ForwardTarget::Hod => self::Hod,
             ForwardTarget::Dean => self::Dean,
             ForwardTarget::Registrar => self::Registrar,
@@ -52,21 +53,12 @@ enum CorrespondenceParty: string
     }
 
     /**
-     * Whether two parties may hold a conversation: Admin Officer ↔ HOD,
-     * Admin Officer ↔ Dean, HOD ↔ Dean, and HOD or Dean ↔ Registrar.
+     * Any two different parties may hold a conversation (Admin Officer,
+     * HOD, Dean and Registrar), in any direction; nobody with themselves.
      */
     public function canConverseWith(self $other): bool
     {
-        $pair = [$this, $other];
-        sort($pair);
-
-        return in_array(array_map(fn (self $party) => $party->value, $pair), [
-            ['admin_officer', 'dean'],
-            ['admin_officer', 'hod'],
-            ['dean', 'hod'],
-            ['dean', 'registrar'],
-            ['hod', 'registrar'],
-        ], true);
+        return $this !== $other;
     }
 
     public function label(): string

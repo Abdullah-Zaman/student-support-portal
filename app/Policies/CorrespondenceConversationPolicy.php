@@ -29,14 +29,15 @@ class CorrespondenceConversationPolicy
     }
 
     /**
-     * Record the Registrar's emailed reply: the HOD or Dean in that
-     * conversation, once something was forwarded to the Registrar.
+     * Record the Registrar's emailed reply: the Admin Officer, HOD or
+     * Dean in that conversation, once something was forwarded to the
+     * Registrar.
      */
     public function logExternalReply(User $user, CorrespondenceConversation $conversation): bool
     {
         return $conversation->isWithRegistrar()
             && ! $conversation->application->isFinal()
-            && $user->isReviewer()
+            && CorrespondenceParty::forRole($user->staffRole()) !== null
             && $this->view($user, $conversation)
             && $conversation->messages()->where('to_party', CorrespondenceParty::Registrar)->exists();
     }

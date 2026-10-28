@@ -150,18 +150,21 @@ test('only the allowed forwarding paths are permitted', function (string $sender
 })->with([
     'admin to HOD' => ['admin', ForwardTarget::Hod, true],
     'admin to Dean' => ['admin', ForwardTarget::Dean, true],
-    'admin to Registrar' => ['admin', ForwardTarget::Registrar, false],
+    'admin to Registrar' => ['admin', ForwardTarget::Registrar, true],
+    'admin to admin' => ['admin', ForwardTarget::AdminOfficer, false],
+    'HOD to admin' => ['hod', ForwardTarget::AdminOfficer, true],
     'HOD to Dean' => ['hod', ForwardTarget::Dean, true],
     'HOD to Registrar' => ['hod', ForwardTarget::Registrar, true],
     'HOD to HOD' => ['hod', ForwardTarget::Hod, false],
+    'Dean to admin' => ['dean', ForwardTarget::AdminOfficer, true],
     'Dean to Registrar' => ['dean', ForwardTarget::Registrar, true],
-    'Dean to HOD' => ['dean', ForwardTarget::Hod, false],
+    'Dean to HOD' => ['dean', ForwardTarget::Hod, true],
     'Dean to Dean' => ['dean', ForwardTarget::Dean, false],
     'student to HOD' => ['student', ForwardTarget::Hod, false],
     'super admin to HOD' => ['super admin', ForwardTarget::Hod, false],
 ]);
 
-test('an illegal forward path is rejected by the action', function () {
+test('forwarding to yourself is rejected by the action', function () {
     $department = Department::factory()->create();
     $admin = createAdminOfficer($department);
     $application = createApplicationInDepartment($department, createStudentUser($department));
@@ -169,8 +172,8 @@ test('an illegal forward path is rejected by the action', function () {
 
     Livewire::actingAs($admin)
         ->test(AdminShow::class, ['application' => $application])
-        ->set('forward_target', 'registrar')
-        ->set('forward_note', 'Skipping the HOD.')
+        ->set('forward_target', 'admin_officer')
+        ->set('forward_note', 'Forwarding to myself.')
         ->call('forward')
         ->assertForbidden();
 

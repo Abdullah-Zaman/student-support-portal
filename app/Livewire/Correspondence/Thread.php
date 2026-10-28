@@ -149,8 +149,9 @@ class Thread extends Component
     }
 
     /**
-     * What the Admin Officer may know about forwards between others,
-     * without any content: "HOD forwarded this to the Dean on 27 Oct".
+     * What the Admin Officer may know about forwards between the HOD,
+     * Dean and Registrar, without any content: "HOD forwarded this to
+     * the Dean on 27 Oct".
      *
      * @return array<int, array<mixed>|string>
      */
@@ -165,6 +166,7 @@ class Thread extends Component
             ->where('application_id', $this->application->id)
             ->where('type', CorrespondenceType::Forward)
             ->where('from_party', '!=', CorrespondenceParty::AdminOfficer)
+            ->where('to_party', '!=', CorrespondenceParty::AdminOfficer)
             ->orderBy('id')
             ->get(['from_party', 'to_party', 'created_at'])
             ->map(fn (CorrespondenceMessage $forward) => __(':from forwarded this to the :to on :date', [

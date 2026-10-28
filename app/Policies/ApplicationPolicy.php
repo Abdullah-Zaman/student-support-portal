@@ -39,9 +39,11 @@ class ApplicationPolicy
     }
 
     /**
-     * Allowed paths: Admin Officer → HOD or Dean; HOD →
-     * Dean or Registrar; Dean → Registrar. An HOD or Dean may only pass
-     * on an application forwarded to them, and nothing final is forwarded.
+     * Admin Officer, HOD and Dean may forward to any other of those roles
+     * or the Registrar, never to themselves (ForwardTarget::allowedFrom).
+     * The Admin Officer acts on their own department's applications; an
+     * HOD or Dean only on applications forwarded to them (so only in
+     * their own department or faculty). Nothing final is forwarded.
      */
     public function forward(User $user, Application $application, ForwardTarget $target): bool
     {

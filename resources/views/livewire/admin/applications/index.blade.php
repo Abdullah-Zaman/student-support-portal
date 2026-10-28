@@ -53,7 +53,7 @@
                 <flux:select wire:model.live="forwarded" :label="__('Forwarded')">
                     <flux:select.option value="">{{ __('All applications') }}</flux:select.option>
                     <flux:select.option value="any">{{ __('Any forward') }}</flux:select.option>
-                    @foreach (\App\Enums\ForwardTarget::cases() as $target)
+                    @foreach (\App\Enums\ForwardTarget::allowedFrom(\App\Enums\RoleName::AdminOfficer) as $target)
                         <flux:select.option :value="$target->value">{{ __($target->badgeLabel()) }}</flux:select.option>
                     @endforeach
                 </flux:select>
