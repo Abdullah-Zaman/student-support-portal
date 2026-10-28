@@ -9,6 +9,7 @@ use App\Http\Controllers\CorrespondenceAttachmentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
+use App\Http\Controllers\SupportRequestAttachmentController;
 use App\Http\Controllers\TimetableFileController;
 use App\Livewire\Admin\Announcements\Index as AdminAnnouncementsIndex;
 use App\Livewire\Admin\Applications\Index as AdminApplicationsIndex;
@@ -36,7 +37,12 @@ use App\Livewire\SuperAdmin\Faculties\Index as SuperAdminFacultiesIndex;
 use App\Livewire\SuperAdmin\Programs\Index as SuperAdminProgramsIndex;
 use App\Livewire\SuperAdmin\Reviewers\Index as SuperAdminReviewersIndex;
 use App\Livewire\SuperAdmin\Settings\Edit as SuperAdminSettingsEdit;
+use App\Livewire\SuperAdmin\Support\Index as SuperAdminSupportIndex;
+use App\Livewire\SuperAdmin\Support\Show as SuperAdminSupportShow;
 use App\Livewire\SuperAdmin\Users\CreateTest as SuperAdminCreateTestUser;
+use App\Livewire\Support\Create as SupportCreate;
+use App\Livewire\Support\Index as SupportIndex;
+use App\Livewire\Support\Show as SupportShow;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -65,6 +71,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('correspondence/attachments/{attachment}', [CorrespondenceAttachmentController::class, 'show'])
         ->name('correspondence.attachments.show');
+
+    Route::get('support/attachments/{attachment}', [SupportRequestAttachmentController::class, 'show'])
+        ->name('support.attachments.show');
 
     Route::get('announcements/{announcement}/image', [AnnouncementFileController::class, 'image'])
         ->name('announcements.image.show');
@@ -109,6 +118,14 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value])
         Route::livewire('timetable/{version}', AdminTimetablesShow::class)->name('timetable.show');
     });
 
+Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value.'|'.RoleName::Hod->value.'|'.RoleName::Dean->value])
+    ->prefix('contact-super-admin')->name('support.')
+    ->group(function () {
+        Route::livewire('/', SupportIndex::class)->name('index');
+        Route::livewire('new', SupportCreate::class)->name('create');
+        Route::livewire('{supportRequest}', SupportShow::class)->name('show');
+    });
+
 Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
     ->prefix('super-admin')->name('super-admin.')
     ->group(function () {
@@ -120,6 +137,9 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
         Route::livewire('admins', SuperAdminAdminOfficersIndex::class)->name('admins.index');
         Route::livewire('reviewers', SuperAdminReviewersIndex::class)->name('reviewers.index');
         Route::livewire('test-users/create', SuperAdminCreateTestUser::class)->name('test-users.create');
+
+        Route::livewire('support-requests', SuperAdminSupportIndex::class)->name('support.index');
+        Route::livewire('support-requests/{supportRequest}', SuperAdminSupportShow::class)->name('support.show');
 
         Route::livewire('students', AdminStudentsIndex::class)->name('students.index');
         Route::livewire('students/{student}', AdminStudentsShow::class)->name('students.show');

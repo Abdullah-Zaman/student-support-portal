@@ -2,6 +2,7 @@
 
 use App\Enums\RoleName;
 use App\Models\Department;
+use App\Models\SupportRequest;
 use App\Models\TimetableVersion;
 use App\Models\User;
 use Illuminate\Routing\Route as IlluminateRoute;
@@ -134,6 +135,7 @@ test('an admin officer gets 403 on every super admin page, including ones in the
         'student' => $student->student->id,
         'application' => createApplicationInDepartment($department, $student)->id,
         'version' => TimetableVersion::factory()->create(['department_id' => $department->id])->id,
+        'supportRequest' => SupportRequest::factory()->create(['reporter_id' => $admin->id])->id,
     ];
 
     $superAdminPages = collect(Route::getRoutes()->getRoutes())

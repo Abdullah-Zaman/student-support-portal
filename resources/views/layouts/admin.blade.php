@@ -11,6 +11,7 @@
     };
     $dashboardRoute = $routePrefix.'dashboard';
     $inboxUnreadCount = ! $isSuperAdmin && auth()->user() ? app(\App\Support\Correspondence\CorrespondenceInbox::class)->unreadCount(auth()->user()) : 0;
+    $openSupportCount = $isSuperAdmin ? \App\Models\SupportRequest::query()->where('status', \App\Enums\SupportRequestStatus::Open)->count() : 0;
     $navItemClass = 'text-white/85! data-current:border-transparent! data-current:bg-white/14! data-current:text-white! hover:text-white! hover:bg-white/8!';
 @endphp
 
@@ -47,6 +48,17 @@
 
                 @unless ($isSuperAdmin)
                     <flux:sidebar.item
+                        icon="lifebuoy"
+                        :href="route('support.index')"
+                        :current="request()->routeIs('support.*')"
+                        wire:navigate
+                        :class="$navItemClass"
+                        data-test="sidebar-contact-super-admin"
+                    >
+                        {{ __('Contact Super Admin') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
                         icon="inbox"
                         :href="route($routePrefix.'inbox')"
                         :current="request()->routeIs($routePrefix.'inbox')"
@@ -79,6 +91,18 @@
                         :class="$navItemClass"
                     >
                         {{ __('HODs & Deans') }}
+                    </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="lifebuoy"
+                        :href="route('super-admin.support.index')"
+                        :current="request()->routeIs('super-admin.support.*')"
+                        :badge="$openSupportCount > 0 ? $openSupportCount : null"
+                        wire:navigate
+                        :class="$navItemClass"
+                        data-test="sidebar-support-requests"
+                    >
+                        {{ __('Support requests') }}
                     </flux:sidebar.item>
 
                     @can('createTest', \App\Models\User::class)
