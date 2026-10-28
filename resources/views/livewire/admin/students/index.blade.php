@@ -85,7 +85,7 @@
                                     <td class="px-3 py-3.5 text-ink-soft">{{ $student->user->department?->name }}</td>
                                 @endif
                                 <td class="px-3 py-3.5 text-ink-soft">{{ $student->program->name }}</td>
-                                <td class="px-3 py-3.5 tabular-nums text-ink-soft">{{ $student->current_semester }}</td>
+                                <td class="px-3 py-3.5 tabular-nums text-ink-soft">{{ $student->semesterLabel() }}</td>
                                 <td class="px-3 py-3.5">
                                     <flux:badge :color="$student->user->status->value === 'active' ? 'green' : ($student->user->status->value === 'suspended' ? 'red' : 'zinc')" size="sm">
                                         {{ \Illuminate\Support\Str::headline($student->user->status->value) }}

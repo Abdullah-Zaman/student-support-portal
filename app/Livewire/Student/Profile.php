@@ -14,7 +14,7 @@ use Livewire\Component;
 #[Title('My Profile')]
 class Profile extends Component
 {
-    public int $current_semester;
+    public ?int $current_semester = null;
 
     public string $section = '';
 
@@ -36,6 +36,8 @@ class Profile extends Component
 
     public function updateSemester(): void
     {
+        abort_if($this->student()->is_alumni, 403);
+
         $validated = $this->validate([
             'current_semester' => ['required', 'integer', 'between:1,8'],
         ]);

@@ -26,7 +26,7 @@ class Show extends Component
 
     public string $program_id = '';
 
-    public int $current_semester = 1;
+    public ?int $current_semester = 1;
 
     public string $batch = '';
 
@@ -107,14 +107,14 @@ class Show extends Component
 
         $validated = $this->validate([
             'program_id' => ['required', 'integer', Rule::in($programs->modelKeys())],
-            'current_semester' => ['required', 'integer', 'between:1,8'],
+            'current_semester' => $this->student->is_alumni ? ['nullable'] : ['required', 'integer', 'between:1,8'],
             'batch' => ['required', 'string', 'max:20'],
         ]);
 
         $program = $programs->firstWhere('id', (int) $validated['program_id']);
         $parsed = RegistrationNumber::parse($this->student->registration_no, openProgramsOnly: false);
 
-        if (($parsed['program_code'] ?? null) !== $program?->code) {
+        if (! $this->student->is_alumni && ($parsed['program_code'] ?? null) !== $program?->code) {
             $this->addError('program_id', __("This doesn't match the student's registration number."));
 
             return;
@@ -122,7 +122,7 @@ class Show extends Component
 
         $this->student->update([
             'program_id' => $program->id,
-            'current_semester' => $validated['current_semester'],
+            'current_semester' => $this->student->is_alumni ? null : $validated['current_semester'],
             'batch' => $validated['batch'],
         ]);
 
@@ -145,6 +145,33 @@ class Show extends Component
         $this->student->user->update(['status' => UserStatus::Active]);
 
         Flux::toast(variant: 'success', text: __('Student reactivated.'));
+    }
+
+    /**
+     * Super Admin only: activate a student whose verification email cannot
+     * be opened (e.g. an old mailbox that no longer exists).
+     */
+    public function markEmailVerified(): void
+    {
+        $this->authorize('markEmailVerified', $this->student);
+
+        $user = $this->student->user;
+        $user->forceFill(['email_verified_at' => now()]);
+
+        if ($user->status === UserStatus::PendingVerification) {
+            $user->status = UserStatus::Active;
+        }
+
+        $user->save();
+
+        activity()
+            ->causedBy(Auth::user())
+            ->performedOn($user)
+            ->withProperties(['registration_no' => $this->student->registration_no])
+            ->log('student email marked verified');
+
+        $this->modal('confirm-mark-verified')->close();
+        Flux::toast(variant: 'success', text: __('Email marked as verified. The student can now log in.'));
     }
 
     public function render(): View

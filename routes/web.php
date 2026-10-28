@@ -35,6 +35,7 @@ use App\Livewire\SuperAdmin\Categories\Index as SuperAdminCategoriesIndex;
 use App\Livewire\SuperAdmin\Departments\Index as SuperAdminDepartmentsIndex;
 use App\Livewire\SuperAdmin\Faculties\Index as SuperAdminFacultiesIndex;
 use App\Livewire\SuperAdmin\Programs\Index as SuperAdminProgramsIndex;
+use App\Livewire\SuperAdmin\RegistrationFormats\Index as SuperAdminRegistrationFormatsIndex;
 use App\Livewire\SuperAdmin\Reviewers\Index as SuperAdminReviewersIndex;
 use App\Livewire\SuperAdmin\Settings\Edit as SuperAdminSettingsEdit;
 use App\Livewire\SuperAdmin\Support\Index as SuperAdminSupportIndex;
@@ -149,6 +150,7 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
         Route::livewire('faculties', SuperAdminFacultiesIndex::class)->name('faculties.index');
         Route::livewire('departments', SuperAdminDepartmentsIndex::class)->name('departments.index');
         Route::livewire('programs', SuperAdminProgramsIndex::class)->name('programs.index');
+        Route::livewire('registration-formats', SuperAdminRegistrationFormatsIndex::class)->name('registration-formats.index');
 
         Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
         Route::livewire('announcements', AdminAnnouncementsIndex::class)->name('announcements.index');

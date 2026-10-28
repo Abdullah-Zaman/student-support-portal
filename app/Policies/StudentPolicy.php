@@ -63,6 +63,15 @@ class StudentPolicy
     }
 
     /**
+     * Marking a student's email verified by hand (their old mailbox may no
+     * longer exist) is Super Admin only, and only while it is unverified.
+     */
+    public function markEmailVerified(User $user, Student $student): bool
+    {
+        return $user->hasRole(RoleName::SuperAdmin->value) && $student->user->email_verified_at === null;
+    }
+
+    /**
      * Students are never deleted.
      */
     public function delete(User $user, Student $student): bool

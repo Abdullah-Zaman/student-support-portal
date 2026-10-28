@@ -14,7 +14,8 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
- * @property int $current_semester
+ * @property int|null $current_semester
+ * @property bool $is_alumni
  * @property string|null $section
  */
 class Student extends Model
@@ -28,14 +29,31 @@ class Student extends Model
         'program_id',
         'current_semester',
         'batch',
+        'is_alumni',
         'section',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_alumni' => 'boolean',
+        ];
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['program_id', 'current_semester', 'batch', 'section'])
+            ->logOnly(['program_id', 'current_semester', 'batch', 'is_alumni', 'section'])
             ->logOnlyDirty();
+    }
+
+    /**
+     * The current semester as a label: the number, or "Alumni" for a
+     * passed-out student, who has none.
+     */
+    public function semesterLabel(): string
+    {
+        return $this->current_semester !== null ? (string) $this->current_semester : __('Alumni');
     }
 
     /**

@@ -25,7 +25,7 @@
                     </div>
                     <div class="flex flex-col gap-1">
                         <dt class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Current semester') }}</dt>
-                        <dd class="m-0 text-[15px] font-semibold">{{ $student->current_semester }}</dd>
+                        <dd class="m-0 text-[15px] font-semibold">{{ $student->semesterLabel() }}</dd>
                     </div>
                     <div class="flex flex-col gap-1">
                         <dt class="text-xs font-semibold tracking-[0.06em] text-subtle uppercase">{{ __('Email') }}</dt>
@@ -69,11 +69,13 @@
                                 <flux:select.option :value="(string) $programOption->id" wire:key="program-{{ $programOption->id }}">{{ $programOption->name }}</flux:select.option>
                             @endforeach
                         </flux:select>
-                        <flux:select wire:model="current_semester" :label="__('Current semester')">
-                            @foreach (range(1, 8) as $semester)
-                                <flux:select.option :value="$semester">{{ $semester }}</flux:select.option>
-                            @endforeach
-                        </flux:select>
+                        @unless ($student->is_alumni)
+                            <flux:select wire:model="current_semester" :label="__('Current semester')">
+                                @foreach (range(1, 8) as $semester)
+                                    <flux:select.option :value="$semester">{{ $semester }}</flux:select.option>
+                                @endforeach
+                            </flux:select>
+                        @endunless
                         <flux:input wire:model="batch" :label="__('Batch')" placeholder="F22" />
                         <flux:button variant="primary" class="self-end" wire:click="updateProfile">{{ __('Save') }}</flux:button>
                     </div>
@@ -82,6 +84,21 @@
 
             <x-panel :title="__('Account')">
                 <div class="flex flex-col gap-3 px-[22px] py-4">
+                    @can('markEmailVerified', $student)
+                        <x-confirm-modal
+                            name="confirm-mark-verified"
+                            :heading="__('Mark this email as verified?')"
+                            :text="__('Use this when the student cannot open the verification email, for example an old mailbox that no longer exists. They will be able to log in.')"
+                            :confirmLabel="__('Mark verified')"
+                            variant="primary"
+                            confirmAction="markEmailVerified"
+                        >
+                            <x-slot:trigger>
+                                <flux:button class="w-full" icon="check-badge" data-test="mark-email-verified">{{ __('Mark email verified') }}</flux:button>
+                            </x-slot:trigger>
+                        </x-confirm-modal>
+                    @endcan
+
                     @if ($this->isSuspended)
                         <x-confirm-modal
                             name="confirm-reactivate-student"

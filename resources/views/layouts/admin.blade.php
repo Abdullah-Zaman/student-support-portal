@@ -169,6 +169,17 @@
                     >
                         {{ __('Programs') }}
                     </flux:sidebar.item>
+
+                    <flux:sidebar.item
+                        icon="identification"
+                        :href="route('super-admin.registration-formats.index')"
+                        :current="request()->routeIs('super-admin.registration-formats.*')"
+                        wire:navigate
+                        :class="$navItemClass"
+                        data-test="sidebar-registration-formats"
+                    >
+                        {{ __('Registration formats') }}
+                    </flux:sidebar.item>
                 @endif
 
                 <flux:sidebar.item

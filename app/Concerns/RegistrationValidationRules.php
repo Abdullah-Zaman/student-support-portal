@@ -4,6 +4,8 @@ namespace App\Concerns;
 
 use App\Models\Student;
 use App\Models\User;
+use App\Support\Registration\RegistrationFormats;
+use App\Support\Registration\StudentEmailDomain;
 use App\Support\RegistrationNumber;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -30,9 +32,9 @@ trait RegistrationValidationRules
     /**
      * @return array<int, ValidationRule|array<mixed>|string>
      */
-    protected function currentSemesterRules(): array
+    protected function currentSemesterRules(bool $isAlumni = false): array
     {
-        return ['required', 'integer', 'between:1,8'];
+        return $isAlumni ? ['nullable'] : ['required', 'integer', 'between:1,8'];
     }
 
     /**
@@ -51,6 +53,10 @@ trait RegistrationValidationRules
             'string',
             function (string $attribute, mixed $value, Closure $fail) use ($program) {
                 $parsed = RegistrationNumber::parse((string) $value);
+
+                if ($parsed === null && RegistrationFormats::matchRegistrationNo((string) $value, $program) !== null) {
+                    return;
+                }
 
                 if ($parsed === null) {
                     $fail(RegistrationNumber::parse((string) $value, openProgramsOnly: false) === null
@@ -71,7 +77,7 @@ trait RegistrationValidationRules
     /**
      * @return array<int, ValidationRule|Closure|array<mixed>|string>
      */
-    protected function emailRules(?string $registrationNo, ?int $ignoreUserId = null): array
+    protected function emailRules(?string $registrationNo, ?int $ignoreUserId = null, ?string $program = null): array
     {
         $unique = Rule::unique(User::class);
 
@@ -79,26 +85,28 @@ trait RegistrationValidationRules
             $unique = $unique->ignore($ignoreUserId);
         }
 
-        $domain = config('students.email_domain');
-
         $rules = [
             'required',
             'string',
             'email',
             'max:255',
-            function (string $attribute, mixed $value, Closure $fail) use ($domain) {
-                if (! str_ends_with(strtolower((string) $value), strtolower($domain))) {
-                    $fail(__('Use your university email ending in :domain.', ['domain' => $domain]));
+            function (string $attribute, mixed $value, Closure $fail) {
+                if (! StudentEmailDomain::isValid((string) $value)) {
+                    $fail(__('Use your university email ending in :domain.', ['domain' => StudentEmailDomain::DOMAIN]));
                 }
             },
             $unique,
         ];
 
         if (config('students.enforce_email_matches_registration_no') && $registrationNo) {
-            $rules[] = function (string $attribute, mixed $value, Closure $fail) use ($registrationNo) {
-                $expected = strtolower($registrationNo).config('students.email_domain');
+            $rules[] = function (string $attribute, mixed $value, Closure $fail) use ($registrationNo, $program) {
+                $expected = strtolower($registrationNo).StudentEmailDomain::DOMAIN;
 
-                if (strtolower((string) $value) !== $expected) {
+                if (StudentEmailDomain::normalize((string) $value) === $expected) {
+                    return;
+                }
+
+                if (RegistrationFormats::matchPair($registrationNo, (string) $value, $program) === null) {
                     $fail(__('Your university email must match your registration number.'));
                 }
             };

@@ -62,14 +62,16 @@
             />
         </x-validated-field>
 
-        <!-- Current Semester -->
-        <x-validated-field>
-            <flux:select wire:model.live="current_semester" wire:blur="blurred('current_semester')" :label="__('Current semester')" :placeholder="__('Select semester')" required>
-                @foreach (range(1, 8) as $semester)
-                    <flux:select.option :value="(string) $semester">{{ $semester }}</flux:select.option>
-                @endforeach
-            </flux:select>
-        </x-validated-field>
+        <!-- Current Semester (not for passed-out students) -->
+        @unless ($this->isAlumniFormat)
+            <x-validated-field>
+                <flux:select wire:model.live="current_semester" wire:blur="blurred('current_semester')" :label="__('Current semester')" :placeholder="__('Select semester')" required>
+                    @foreach (range(1, 8) as $semester)
+                        <flux:select.option :value="(string) $semester">{{ $semester }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </x-validated-field>
+        @endunless
 
         <!-- Password -->
         <x-validated-field>

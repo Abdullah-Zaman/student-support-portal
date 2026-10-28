@@ -12,7 +12,7 @@
 @if ($isForward)
 
 ---------- {!! __('Forwarded application') !!} ----------
-{!! __('From:') !!} {!! $student->user->name !!} ({!! $student->registration_no !!}, {!! $student->program?->code !!}, {!! __('Semester :n', ['n' => $application->semester_at_submission]) !!})
+{!! __('From:') !!} {!! $student->user->name !!} ({!! $student->registration_no !!}, {!! $student->program?->code !!}, {!! $application->semester_at_submission !== null ? __('Semester :n', ['n' => $application->semester_at_submission]) : __('Alumni') !!})
 {!! __('Date:') !!} {!! $application->created_at->format('D, j M Y, g:i A') !!}
 {!! __('Subject:') !!} {!! $application->subject !!}
 

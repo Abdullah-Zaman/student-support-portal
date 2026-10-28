@@ -31,19 +31,21 @@
 
         <flux:separator class="my-6" />
 
-        <form wire:submit="updateSemester" class="flex max-w-xs flex-col gap-4">
-            <flux:select wire:model="current_semester" :label="__('Current semester')" required>
-                @foreach (range(1, 8) as $semester)
-                    <flux:select.option :value="(string) $semester">{{ $semester }}</flux:select.option>
-                @endforeach
-            </flux:select>
+        @unless (auth()->user()->student->is_alumni)
+            <form wire:submit="updateSemester" class="flex max-w-xs flex-col gap-4">
+                <flux:select wire:model="current_semester" :label="__('Current semester')" required>
+                    @foreach (range(1, 8) as $semester)
+                        <flux:select.option :value="(string) $semester">{{ $semester }}</flux:select.option>
+                    @endforeach
+                </flux:select>
 
-            <flux:button type="submit" variant="primary" data-test="update-semester-button">
-                {{ __('Save') }}
-            </flux:button>
-        </form>
+                <flux:button type="submit" variant="primary" data-test="update-semester-button">
+                    {{ __('Save') }}
+                </flux:button>
+            </form>
 
-        <flux:separator class="my-6" />
+            <flux:separator class="my-6" />
+        @endunless
 
         <div class="flex flex-col gap-1.5">
             <h2 class="m-0 text-[17px] font-bold text-ink">{{ __('Timetable section') }}</h2>

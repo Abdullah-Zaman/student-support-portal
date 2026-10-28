@@ -5,6 +5,8 @@ namespace App\Livewire\Auth;
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\RegistrationValidationRules;
 use App\Models\Program;
+use App\Support\Registration\RegistrationFormats;
+use App\Support\Registration\StudentEmailDomain;
 use App\Support\RegistrationNumber;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Contracts\Auth\StatefulGuard;
@@ -15,6 +17,9 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
+/**
+ * @property-read bool $isAlumniFormat
+ */
 #[Title('Register')]
 class Register extends Component
 {
@@ -129,8 +134,8 @@ class Register extends Component
             'name' => $this->nameRules(),
             'program' => $this->programRules(),
             'registration_no' => $this->registrationNoRules($this->program ?: null),
-            'email' => $this->emailRules($this->registration_no ?: null),
-            'current_semester' => $this->currentSemesterRules(),
+            'email' => $this->emailRules($this->registration_no ?: null, null, $this->program ?: null),
+            'current_semester' => $this->currentSemesterRules($this->isAlumniFormat),
             'password' => $this->passwordRules(),
             default => null,
         };
@@ -143,6 +148,24 @@ class Register extends Component
     public function programs(): Collection
     {
         return Program::withoutGlobalScopes()->openForRegistration()->orderBy('name')->get();
+    }
+
+    /**
+     * Whether the registration number and email fit an additional
+     * "passed out" format, in which case there is no current semester.
+     */
+    #[Computed]
+    public function isAlumniFormat(): bool
+    {
+        if ($this->registration_no === '' || $this->email === '') {
+            return false;
+        }
+
+        $fitsCurrentFormat = RegistrationNumber::parse($this->registration_no) !== null
+            && StudentEmailDomain::normalize($this->email) === strtolower($this->registration_no).StudentEmailDomain::DOMAIN;
+
+        return ! $fitsCurrentFormat
+            && (RegistrationFormats::matchPair($this->registration_no, $this->email, $this->program ?: null)['is_alumni'] ?? false);
     }
 
     #[Computed]
@@ -158,7 +181,7 @@ class Register extends Component
             'registration_no' => $this->registration_no,
             'email' => $this->email,
             'program' => $this->program,
-            'current_semester' => $this->current_semester,
+            'current_semester' => $this->isAlumniFormat ? '' : $this->current_semester,
             'password' => $this->password,
             'password_confirmation' => $this->password_confirmation,
         ]);
