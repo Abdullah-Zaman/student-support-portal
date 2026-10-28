@@ -41,6 +41,14 @@
             </flux:select>
         </div>
 
+        <div class="flex min-w-0 flex-1 basis-40 flex-col gap-1">
+            <flux:select wire:model.live="test" :label="__('Test accounts')">
+                <flux:select.option value="">{{ __('Show all') }}</flux:select.option>
+                <flux:select.option value="only">{{ __('Only test accounts') }}</flux:select.option>
+                <flux:select.option value="hide">{{ __('Hide test accounts') }}</flux:select.option>
+            </flux:select>
+        </div>
+
         @if ($this->hasActiveFilters)
             <flux:button variant="ghost" wire:click="clearFilters">{{ __('Clear filters') }}</flux:button>
         @endif
@@ -69,7 +77,7 @@
                             <tr class="border-t border-border-soft">
                                 <td class="px-[22px] py-3.5">
                                     <a href="{{ route($routePrefix.'students.show', $student) }}" wire:navigate class="flex flex-col gap-0.5 no-underline">
-                                        <span class="font-semibold text-ink">{{ $student->user->name }}</span>
+                                        <span class="flex flex-wrap items-center gap-2 font-semibold text-ink">{{ $student->user->name }} @if ($student->user->is_test)<x-test-badge />@endif</span>
                                         <span class="text-[13px] text-subtle tabular-nums">{{ $student->registration_no }}</span>
                                     </a>
                                 </td>

@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Enums\RoleName;
 use App\Enums\UserStatus;
 use App\Models\User;
+use App\Support\TestUserCreation;
 
 class UserPolicy
 {
@@ -16,6 +17,15 @@ class UserPolicy
     public function create(User $user): bool
     {
         return $user->hasRole(RoleName::SuperAdmin->value);
+    }
+
+    /**
+     * The test-user tool: Super Admin only, and only while the tool is
+     * enabled (flag on, not production).
+     */
+    public function createTest(User $user): bool
+    {
+        return TestUserCreation::enabled() && $user->hasRole(RoleName::SuperAdmin->value);
     }
 
     public function update(User $user, User $target): bool

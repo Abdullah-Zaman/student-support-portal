@@ -80,6 +80,19 @@
                     >
                         {{ __('HODs & Deans') }}
                     </flux:sidebar.item>
+
+                    @can('createTest', \App\Models\User::class)
+                        <flux:sidebar.item
+                            icon="beaker"
+                            :href="route('super-admin.test-users.create')"
+                            :current="request()->routeIs('super-admin.test-users.*')"
+                            wire:navigate
+                            :class="$navItemClass"
+                            data-test="sidebar-create-test-user"
+                        >
+                            {{ __('Create test user') }}
+                        </flux:sidebar.item>
+                    @endcan
                 @endif
 
                 <flux:sidebar.item

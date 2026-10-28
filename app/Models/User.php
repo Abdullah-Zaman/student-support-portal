@@ -32,6 +32,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property UserStatus $status
  * @property string|null $email_signature
  * @property string|null $mail_to_email
+ * @property bool $is_test
  * @property Carbon|null $last_login_at
  * @property string|null $remember_token
  * @property Carbon|null $created_at
@@ -55,6 +56,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'status' => UserStatus::class,
+            'is_test' => 'boolean',
             'last_login_at' => 'datetime',
         ];
     }

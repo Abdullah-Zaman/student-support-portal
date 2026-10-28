@@ -36,6 +36,9 @@ class Index extends Component
     #[Url]
     public string $department_id = '';
 
+    #[Url]
+    public string $test = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', Student::class);
@@ -43,14 +46,14 @@ class Index extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['search', 'semester', 'status', 'department_id', ...$this->studentProfileFilterProperties()], true)) {
+        if (in_array($property, ['search', 'semester', 'status', 'department_id', 'test', ...$this->studentProfileFilterProperties()], true)) {
             $this->resetPage();
         }
     }
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'semester', 'status', 'department_id', ...$this->studentProfileFilterProperties()]);
+        $this->reset(['search', 'semester', 'status', 'department_id', 'test', ...$this->studentProfileFilterProperties()]);
         $this->resetPage();
     }
 
@@ -61,7 +64,8 @@ class Index extends Component
             || $this->hasStudentProfileFilters()
             || $this->semester !== ''
             || $this->status !== ''
-            || $this->department_id !== '';
+            || $this->department_id !== ''
+            || $this->test !== '';
     }
 
     #[Computed]
@@ -100,6 +104,8 @@ class Index extends Component
             ->when($this->semester !== '', fn (Builder $query) => $query->where('current_semester', $this->semester))
             ->when($this->status !== '', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('status', $this->status)))
             ->when($this->isSuperAdmin() && $this->department_id !== '', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('department_id', $this->department_id)))
+            ->when($this->test === 'only', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('is_test', true)))
+            ->when($this->test === 'hide', fn (Builder $query) => $query->whereHas('user', fn (Builder $query) => $query->where('is_test', false)))
             ->orderBy('registration_no')
             ->paginate(15);
     }

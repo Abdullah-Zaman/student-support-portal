@@ -36,6 +36,7 @@ use App\Livewire\SuperAdmin\Faculties\Index as SuperAdminFacultiesIndex;
 use App\Livewire\SuperAdmin\Programs\Index as SuperAdminProgramsIndex;
 use App\Livewire\SuperAdmin\Reviewers\Index as SuperAdminReviewersIndex;
 use App\Livewire\SuperAdmin\Settings\Edit as SuperAdminSettingsEdit;
+use App\Livewire\SuperAdmin\Users\CreateTest as SuperAdminCreateTestUser;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -118,6 +119,7 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
 
         Route::livewire('admins', SuperAdminAdminOfficersIndex::class)->name('admins.index');
         Route::livewire('reviewers', SuperAdminReviewersIndex::class)->name('reviewers.index');
+        Route::livewire('test-users/create', SuperAdminCreateTestUser::class)->name('test-users.create');
 
         Route::livewire('students', AdminStudentsIndex::class)->name('students.index');
         Route::livewire('students/{student}', AdminStudentsShow::class)->name('students.show');

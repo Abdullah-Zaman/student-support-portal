@@ -23,7 +23,7 @@
                         @foreach ($this->admins as $admin)
                             <tr class="border-t border-border-soft">
                                 <td class="px-[22px] py-3.5">
-                                    <span class="font-semibold text-ink">{{ $admin->name }}</span>
+                                    <span class="flex flex-wrap items-center gap-2 font-semibold text-ink">{{ $admin->name }} @if ($admin->is_test)<x-test-badge />@endif</span>
                                     <span class="block text-[13px] text-subtle">{{ $admin->email }}</span>
                                 </td>
                                 <td class="px-3 py-3.5 text-ink-soft">{{ $admin->department?->name }}</td>

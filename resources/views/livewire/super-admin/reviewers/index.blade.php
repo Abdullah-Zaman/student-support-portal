@@ -27,7 +27,7 @@
                             @endphp
                             <tr class="border-t border-border-soft" wire:key="reviewer-{{ $reviewer->id }}">
                                 <td class="px-[22px] py-3.5">
-                                    <span class="font-semibold text-ink">{{ $reviewer->name }}</span>
+                                    <span class="flex flex-wrap items-center gap-2 font-semibold text-ink">{{ $reviewer->name }} @if ($reviewer->is_test)<x-test-badge />@endif</span>
                                     <span class="block text-[13px] text-subtle">{{ $reviewer->email }}</span>
                                 </td>
                                 <td class="px-3 py-3.5">
