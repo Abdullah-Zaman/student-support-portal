@@ -7,8 +7,19 @@
                 subject: @js($subject),
                 body: @js($body),
                 failedUploads: [],
+                uploadErrorReason(file) {
+                    if (file.size > {{ \App\Livewire\Student\Applications\Create::ATTACHMENT_MAX_KILOBYTES }} * 1024) {
+                        return @js(__('is too large. Maximum size is 5 MB.'));
+                    }
+
+                    if (! /\.(pdf|jpe?g|png|docx?)$/i.test(file.name)) {
+                        return @js(__('is not an allowed type. Use PDF, JPG, PNG, DOC or DOCX.'));
+                    }
+
+                    return @js(__('could not be uploaded because of a server or network problem. Please try again, and contact the Admin Office if it keeps failing.'));
+                },
                 onUploadError(event) {
-                    this.failedUploads = Array.from(event.target.files ?? []).map((file) => file.name);
+                    this.failedUploads = Array.from(event.target.files ?? []).map((file) => ({ name: file.name, reason: this.uploadErrorReason(file) }));
                 },
             }"
             x-on:livewire-upload-error="onUploadError($event)"
@@ -61,8 +72,8 @@
                 </flux:field>
             </x-validated-field>
 
-            <template x-for="name in failedUploads" :key="name">
-                <p class="text-sm font-medium text-red-600" x-text="name + ' {{ __('could not be uploaded. It may be too large.') }}'"></p>
+            <template x-for="failed in failedUploads" :key="failed.name">
+                <p class="text-sm font-medium text-red-600" x-text="failed.name + ' ' + failed.reason"></p>
             </template>
 
             @if ($attachments)

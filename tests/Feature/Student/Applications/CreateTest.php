@@ -206,3 +206,32 @@ test('a category from another department cannot be selected', function () {
         ->call('submit')
         ->assertHasErrors(['category_id']);
 });
+
+test('a small PNG, JPG and PDF are all accepted as attachments', function () {
+    $student = createStudentUser();
+
+    Livewire::actingAs($student)
+        ->test(Create::class)
+        ->set('attachments', [
+            UploadedFile::fake()->image('attendance_sample.png', 400, 300)->size(29),
+            UploadedFile::fake()->image('photo.jpg', 400, 300)->size(15),
+            UploadedFile::fake()->create('slip.pdf', 10, 'application/pdf'),
+        ])
+        ->assertHasNoErrors();
+});
+
+test('the upload failure message names the real reason instead of always saying too large', function () {
+    $student = createStudentUser();
+
+    $this->actingAs($student)
+        ->get(route('student.applications.create'))
+        ->assertOk()
+        ->assertSee('is too large. Maximum size is 5 MB.')
+        ->assertSee('is not an allowed type. Use PDF, JPG, PNG, DOC or DOCX.')
+        ->assertSee('could not be uploaded because of a server or network problem.')
+        ->assertDontSee('It may be too large.');
+});
+
+test('PHP has a writable temp directory, which uploads need before Laravel sees the file', function () {
+    expect(is_writable(sys_get_temp_dir()))->toBeTrue(sys_get_temp_dir().' is not writable: uploads fail with "unable to create a temporary file". Set upload_tmp_dir in php.ini or TEMP/TMP in the environment that starts the server.');
+});

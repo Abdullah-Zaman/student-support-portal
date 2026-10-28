@@ -12,6 +12,11 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 trait ApplicationValidationRules
 {
     /**
+     * Largest allowed attachment, in kilobytes (5 MB).
+     */
+    public const ATTACHMENT_MAX_KILOBYTES = 5120;
+
+    /**
      * @return array<int, ValidationRule|array<mixed>|string>
      */
     protected function categoryIdRules(int $departmentId): array
@@ -53,7 +58,7 @@ trait ApplicationValidationRules
      */
     protected function attachmentRules(): array
     {
-        return ['file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'];
+        return ['file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:'.self::ATTACHMENT_MAX_KILOBYTES];
     }
 
     protected function subjectMaxLength(): int
