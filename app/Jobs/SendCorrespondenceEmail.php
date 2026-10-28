@@ -56,6 +56,12 @@ class SendCorrespondenceEmail implements ShouldBeUnique, ShouldQueue
 
         $message->increment('email_attempts');
 
+        $currentAddress = $builder->recipientEmail($message);
+
+        if ($message->to_user_id === null && $message->to_email !== $currentAddress) {
+            $message->update(['to_email' => $currentAddress]);
+        }
+
         try {
             $sent = $this->send($gmail, $builder, $message);
         } catch (GmailNotConnected $exception) {

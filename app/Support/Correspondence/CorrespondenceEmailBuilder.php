@@ -2,7 +2,9 @@
 
 namespace App\Support\Correspondence;
 
+use App\Actions\Forwarding\ForwardApplication;
 use App\Enums\CorrespondenceEmailStatus;
+use App\Enums\CorrespondenceParty;
 use App\Enums\CorrespondenceType;
 use App\Models\ApplicationAttachment;
 use App\Models\CorrespondenceAttachment;
@@ -96,11 +98,23 @@ class CorrespondenceEmailBuilder
         return $prefix.$message->application->subject.' ('.$message->application->application_no.')';
     }
 
+    /**
+     * A portal user's mail_to_email (or login email). The Registrar's
+     * address is the current forwarding.registrar_email setting, read at
+     * send time, so a message that waited (pending Gmail, retry) never
+     * goes to an outdated address; the stored one is the fallback.
+     */
     public function recipientEmail(CorrespondenceMessage $message): string
     {
-        return $message->to_user_id !== null
-            ? ($message->recipient->mail_to_email ?? $message->recipient->email)
-            : (string) $message->to_email;
+        if ($message->to_user_id !== null) {
+            return $message->recipient->mail_to_email ?? $message->recipient->email;
+        }
+
+        if ($message->to_party === CorrespondenceParty::Registrar) {
+            return ForwardApplication::registrarEmail() ?? (string) $message->to_email;
+        }
+
+        return (string) $message->to_email;
     }
 
     /**

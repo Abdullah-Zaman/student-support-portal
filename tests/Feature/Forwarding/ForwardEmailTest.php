@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Correspondence\QueueCorrespondenceEmail;
 use App\Actions\Correspondence\ReplyToCorrespondence;
+use App\Actions\Forwarding\ForwardApplication;
 use App\Enums\CorrespondenceEmailStatus;
 use App\Enums\CorrespondenceParty;
 use App\Enums\ForwardTarget;
@@ -11,6 +13,7 @@ use App\Models\ApplicationAttachment;
 use App\Models\CorrespondenceMessage;
 use App\Models\Department;
 use App\Models\GoogleAccount;
+use App\Models\Setting;
 use App\Support\Gmail\GmailSender;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -409,4 +412,22 @@ test('MAIL_STUDENTS_TO does not redirect staff Gmail emails', function () {
         ->call('forward');
 
     expect(sentGmailMessages()[0])->toContain("To: {$hod->email}")->not->toContain('student-test@superior.edu.pk');
+});
+
+test('a Registrar email uses the registrar address current at send time, not the one stored when it was forwarded', function () {
+    fakeGmailApi();
+    config(['mail.always_to' => null]);
+    $department = Department::factory()->create();
+    $dean = createDean($department->faculty);
+    $application = createApplicationInDepartment($department, createStudentUser($department));
+    $forward = recordForward($application, ForwardTarget::Registrar, $dean);
+    $forward->update(['to_email' => 'old-registrar@example.test', 'email_status' => CorrespondenceEmailStatus::AwaitingGmail]);
+
+    Setting::set(ForwardApplication::REGISTRAR_EMAIL_SETTING, 'current-registrar@example.test');
+    connectGmail($dean);
+    app(QueueCorrespondenceEmail::class)->handle($forward->refresh());
+
+    expect(sentGmailMessages()[0])->toContain('To: current-registrar@example.test')->not->toContain('old-registrar@example.test')
+        ->and($forward->refresh()->to_email)->toBe('current-registrar@example.test')
+        ->and($forward->email_status)->toBe(CorrespondenceEmailStatus::Sent);
 });
