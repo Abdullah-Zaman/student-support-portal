@@ -24,6 +24,15 @@ final class TimetableExplorer
     }
 
     /**
+     * Section comparison key: lowercase with spaces, dashes and underscores
+     * removed, so "7-B", "bsse 7b" and "BSSE-7B" line up.
+     */
+    public static function sectionKey(?string $text): string
+    {
+        return (string) preg_replace('/[\s\-_]+/u', '', mb_strtolower((string) $text));
+    }
+
+    /**
      * @return array{teachers: int, rooms: int, sections: int, subjects: int, classes: int}
      */
     public function stats(): array
@@ -130,12 +139,12 @@ final class TimetableExplorer
      */
     public function sections(string $term, ?int $day, bool $exact = false): Collection
     {
-        $needle = self::normalize($term);
+        $needle = self::sectionKey($term);
 
         return $this->classes
             ->flatMap(fn (TimetableClass $class) => $class->sections->pluck('section'))
             ->unique()
-            ->filter(fn (string $section): bool => $exact ? self::normalize($section) === $needle : str_contains(self::normalize($section), $needle))
+            ->filter(fn (string $section): bool => $exact ? self::sectionKey($section) === $needle : str_contains(self::sectionKey($section), $needle))
             ->sort()
             ->values()
             ->map(fn (string $name): array => [

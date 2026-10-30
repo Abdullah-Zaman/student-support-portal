@@ -113,6 +113,15 @@ test('section search shows that sections week', function () {
         ->assertDontSee('Operating Systems');
 });
 
+test('section search ignores case, spaces, dashes and underscores and matches partial text', function (string $term) {
+    seedTimetable($this->version);
+
+    Livewire::actingAs(createAdminOfficer($this->department))->test(Explorer::class)
+        ->set('mode', 'section')->set('term', $term)
+        ->assertSee('Databases')
+        ->assertDontSee('Operating Systems');
+})->with(['5B', '5-b', 'bsse 5b', 'BSSE_5-B']);
+
 test('student search shows the timetable of the selected section', function () {
     seedTimetable($this->version);
     $student = createStudentUser($this->department);
