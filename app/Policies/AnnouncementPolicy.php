@@ -13,6 +13,7 @@ class AnnouncementPolicy
         return $user->hasAnyRole([
             RoleName::Student->value,
             RoleName::AdminOfficer->value,
+            RoleName::Hod->value,
             RoleName::SuperAdmin->value,
         ]);
     }
@@ -23,7 +24,7 @@ class AnnouncementPolicy
             return true;
         }
 
-        if ($user->hasRole(RoleName::AdminOfficer->value)) {
+        if ($user->hasAnyRole([RoleName::AdminOfficer->value, RoleName::Hod->value])) {
             return $user->department_id === $announcement->department_id;
         }
 
@@ -35,7 +36,7 @@ class AnnouncementPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole([RoleName::AdminOfficer->value, RoleName::SuperAdmin->value]);
+        return $user->hasAnyRole([RoleName::AdminOfficer->value, RoleName::Hod->value, RoleName::SuperAdmin->value]);
     }
 
     public function update(User $user, Announcement $announcement): bool
@@ -44,8 +45,19 @@ class AnnouncementPolicy
             return true;
         }
 
-        return $user->hasRole(RoleName::AdminOfficer->value)
+        return $user->hasAnyRole([RoleName::AdminOfficer->value, RoleName::Hod->value])
             && $user->department_id === $announcement->department_id;
+    }
+
+    /**
+     * Students acknowledge only a current announcement of their own
+     * department, and only for themselves.
+     */
+    public function acknowledge(User $user, Announcement $announcement): bool
+    {
+        return $user->hasRole(RoleName::Student->value)
+            && $user->department_id === $announcement->department_id
+            && $announcement->isCurrentlyVisible();
     }
 
     /**

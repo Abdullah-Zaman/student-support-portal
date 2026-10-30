@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\RequireAnnouncementAcknowledgement;
 use App\Listeners\ActivateVerifiedUser;
 use App\Listeners\LogOutOtherSessionsOnPasswordReset;
 use App\Listeners\RecordFailedLogin;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Livewire\Livewire;
 use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureMailSafety();
+
+        Livewire::addPersistentMiddleware([RequireAnnouncementAcknowledgement::class]);
 
         Gate::policy(Activity::class, ActivityPolicy::class);
 

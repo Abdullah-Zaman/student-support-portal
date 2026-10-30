@@ -59,6 +59,14 @@ trait AnnouncementValidationRules
     }
 
     /**
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function surveyUrlRules(): array
+    {
+        return ['nullable', 'url:https', 'max:500'];
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function announcementMessages(): array
@@ -72,6 +80,7 @@ trait AnnouncementValidationRules
             'image.max' => __('The image must be 2 MB or smaller.'),
             'attachment.mimes' => __('The attachment must be a PDF, DOC or DOCX file.'),
             'attachment.max' => __('The attachment must be 5 MB or smaller.'),
+            'survey_url.url' => __('The form link must be a valid https:// address.'),
             'expires_at.after' => __('The expiry date must be after the publish date.'),
         ];
     }

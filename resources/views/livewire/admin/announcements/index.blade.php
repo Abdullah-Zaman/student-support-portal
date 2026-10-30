@@ -36,6 +36,9 @@
                             <tr class="border-t border-border-soft">
                                 <td class="px-[22px] py-3.5">
                                     <span class="font-semibold text-ink">{{ $announcement->title }}</span>
+                                    @if ($announcement->requires_acknowledgement)
+                                        <flux:badge color="amber" size="sm" class="ms-2">{{ __('Mandatory') }}</flux:badge>
+                                    @endif
                                 </td>
                                 @if ($this->isSuperAdmin)
                                     <td class="px-3 py-3.5 text-ink-soft">{{ $announcement->department->name }}</td>
@@ -46,7 +49,17 @@
                                 <td class="px-[22px] py-3.5 text-right">
                                     <div class="flex justify-end gap-2">
                                         <flux:button variant="ghost" size="sm" wire:click="startEdit({{ $announcement->id }})">{{ __('Edit') }}</flux:button>
-                                        <flux:button variant="ghost" size="sm" wire:click="toggleActive({{ $announcement->id }})">
+                                        @if ($announcement->requires_acknowledgement)
+                                            <flux:button variant="ghost" size="sm" wire:click="showAcknowledgements({{ $announcement->id }})">
+                                                {{ __('Acknowledged: :count', ['count' => $announcement->acknowledgements_count]) }}
+                                            </flux:button>
+                                        @endif
+                                        <flux:button
+                                            variant="ghost"
+                                            size="sm"
+                                            wire:click="toggleActive({{ $announcement->id }})"
+                                            wire:confirm="{{ $announcement->is_active ? __('Deactivate this announcement now? Students will no longer be blocked by it.') : __('Activate this announcement?') }}"
+                                        >
                                             {{ $announcement->is_active ? __('Deactivate') : __('Activate') }}
                                         </flux:button>
                                     </div>
@@ -103,12 +116,47 @@
 
             <flux:checkbox wire:model="is_active" :label="__('Active')" />
 
+            <flux:checkbox wire:model="requires_acknowledgement" :label="__('Mandatory: students must acknowledge before using the portal')" />
+
+            <flux:input wire:model="survey_url" type="url" :label="__('Form link (optional)')" :description="__('An https:// link, for example a Google Form. Opens in a new tab.')" maxlength="500" />
+
             <div class="flex justify-end gap-2">
                 <flux:modal.close>
                     <flux:button variant="ghost">{{ __('Cancel') }}</flux:button>
                 </flux:modal.close>
                 <flux:button variant="primary" wire:click="save">{{ __('Save') }}</flux:button>
             </div>
+        </div>
+    </flux:modal>
+
+    <flux:modal name="announcement-acknowledgements" class="md:w-[36rem]">
+        <div class="flex flex-col gap-4">
+            <flux:heading size="lg">{{ __('Acknowledged by :count students', ['count' => $this->acknowledgements->count()]) }}</flux:heading>
+
+            @if ($this->acknowledgements->isEmpty())
+                <p class="m-0 text-sm text-subtle">{{ __('No student has acknowledged this announcement yet.') }}</p>
+            @else
+                <div class="max-h-96 overflow-y-auto">
+                    <table class="w-full border-collapse text-sm">
+                        <thead>
+                            <tr class="text-left text-xs tracking-[0.06em] text-subtle uppercase">
+                                <th class="py-2 pe-3 font-semibold">{{ __('Name') }}</th>
+                                <th class="px-3 py-2 font-semibold">{{ __('Reg. no.') }}</th>
+                                <th class="px-3 py-2 font-semibold">{{ __('Time') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($this->acknowledgements as $acknowledgement)
+                                <tr class="border-t border-border-soft">
+                                    <td class="py-2 pe-3 text-ink">{{ $acknowledgement->user->name }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-ink-soft">{{ $acknowledgement->user->student?->registration_no }}</td>
+                                    <td class="px-3 py-2 whitespace-nowrap text-ink-soft">{{ $acknowledgement->acknowledged_at->format('j M Y, g:i A') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </flux:modal>
 </div>

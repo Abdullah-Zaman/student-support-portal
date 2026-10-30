@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Announcements;
 use App\Concerns\AnnouncementValidationRules;
 use App\Enums\RoleName;
 use App\Models\Announcement;
+use App\Models\AnnouncementAcknowledgement;
 use App\Models\Department;
 use App\Models\Scopes\AdminDepartmentScope;
 use Flux\Flux;
@@ -39,6 +40,12 @@ class Index extends Component
 
     public bool $is_active = true;
 
+    public bool $requires_acknowledgement = false;
+
+    public string $survey_url = '';
+
+    public ?int $viewing_id = null;
+
     public string $department_id = '';
 
     public function mount(): void
@@ -67,14 +74,48 @@ class Index extends Component
     #[Computed]
     public function announcements(): LengthAwarePaginator
     {
-        return Announcement::query()->with('department')->latest()->paginate(15);
+        return Announcement::query()
+            ->with('department')
+            ->withCount('acknowledgements')
+            ->unless($this->isSuperAdmin(), fn ($query) => $query->where('department_id', Auth::user()->department_id))
+            ->latest()
+            ->paginate(15);
+    }
+
+    /**
+     * Who acknowledged the announcement being viewed, newest first.
+     * Staff only: students never reach this component.
+     *
+     * @return Collection<int, AnnouncementAcknowledgement>
+     */
+    #[Computed]
+    public function acknowledgements(): Collection
+    {
+        if ($this->viewing_id === null) {
+            return new Collection;
+        }
+
+        $announcement = $this->findAnnouncement($this->viewing_id);
+        $this->authorize('update', $announcement);
+
+        return $announcement->acknowledgements()->with('user.student')->latest('acknowledged_at')->get();
+    }
+
+    public function showAcknowledgements(int $id): void
+    {
+        $this->authorize('update', $this->findAnnouncement($id));
+
+        $this->viewing_id = $id;
+        unset($this->acknowledgements);
+
+        $this->modal('announcement-acknowledgements')->show();
     }
 
     public function startCreate(): void
     {
         $this->authorize('create', Announcement::class);
 
-        $this->reset(['editing_id', 'title', 'body', 'image', 'attachment', 'publish_at', 'expires_at', 'is_active', 'department_id']);
+        $this->reset(['editing_id', 'title', 'body', 'image', 'attachment', 'publish_at', 'expires_at', 'is_active', 'requires_acknowledgement', 'survey_url', 'department_id']);
         $this->is_active = true;
         $this->resetValidation();
 
@@ -94,6 +135,8 @@ class Index extends Component
         $this->publish_at = $announcement->publish_at?->format('Y-m-d\TH:i') ?? '';
         $this->expires_at = $announcement->expires_at?->format('Y-m-d\TH:i') ?? '';
         $this->is_active = $announcement->is_active;
+        $this->requires_acknowledgement = $announcement->requires_acknowledgement;
+        $this->survey_url = $announcement->survey_url ?? '';
         $this->department_id = (string) $announcement->department_id;
         $this->resetValidation();
 
@@ -114,6 +157,8 @@ class Index extends Component
             'publish_at' => $this->publishAtRules(),
             'expires_at' => $this->expiresAtRules($this->publish_at ?: null),
             'is_active' => ['boolean'],
+            'requires_acknowledgement' => ['boolean'],
+            'survey_url' => $this->surveyUrlRules(),
             'department_id' => $this->isSuperAdmin()
                 ? ['required', Rule::exists(Department::class, 'id')]
                 : ['nullable'],
@@ -125,6 +170,8 @@ class Index extends Component
             'publish_at' => $validated['publish_at'] ?: null,
             'expires_at' => $validated['expires_at'] ?: null,
             'is_active' => $validated['is_active'],
+            'requires_acknowledgement' => $validated['requires_acknowledgement'],
+            'survey_url' => $validated['survey_url'] ?: null,
         ];
 
         if ($this->isSuperAdmin()) {

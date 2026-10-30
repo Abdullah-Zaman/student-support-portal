@@ -7,10 +7,12 @@ use App\Http\Controllers\ApplicationAttachmentController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\CorrespondenceAttachmentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Student\AnnouncementAcknowledgementController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
 use App\Http\Controllers\SupportRequestAttachmentController;
 use App\Http\Controllers\TimetableFileController;
+use App\Http\Middleware\RequireAnnouncementAcknowledgement;
 use App\Livewire\Admin\Announcements\Index as AdminAnnouncementsIndex;
 use App\Livewire\Admin\Applications\Index as AdminApplicationsIndex;
 use App\Livewire\Admin\Applications\Show as AdminApplicationsShow;
@@ -85,7 +87,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('timetable.download');
 });
 
+/*
+ * The acknowledgement page sits outside the gated group below, so a
+ * student with a pending mandatory announcement can always reach it.
+ */
 Route::middleware(['auth', 'verified', 'role:'.RoleName::Student->value])
+    ->prefix('student')->name('student.')
+    ->group(function () {
+        Route::get('announcements/acknowledge', [AnnouncementAcknowledgementController::class, 'show'])
+            ->name('announcements.acknowledge');
+        Route::post('announcements/{announcement}/acknowledge', [AnnouncementAcknowledgementController::class, 'store'])
+            ->middleware('throttle:30,1')
+            ->name('announcements.acknowledge.store');
+    });
+
+Route::middleware(['auth', 'verified', 'role:'.RoleName::Student->value, RequireAnnouncementAcknowledgement::class])
     ->prefix('student')->name('student.')
     ->group(function () {
         Route::get('dashboard', StudentDashboardController::class)->name('dashboard');
@@ -170,12 +186,16 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::SuperAdmin->value])
 foreach ([RoleName::Hod, RoleName::Dean] as $reviewerRole) {
     Route::middleware(['auth', 'verified', 'role:'.$reviewerRole->value])
         ->prefix($reviewerRole->value)->name($reviewerRole->value.'.')
-        ->group(function () {
+        ->group(function () use ($reviewerRole) {
             Route::livewire('dashboard', ReviewerDashboard::class)->name('dashboard');
             Route::livewire('applications', ReviewerApplicationsIndex::class)->name('applications.index');
             Route::livewire('applications/{application}', ReviewerApplicationsShow::class)->name('applications.show');
             Route::livewire('inbox', CorrespondenceInbox::class)->name('inbox');
             Route::livewire('notifications', NotificationsIndex::class)->name('notifications.index');
+
+            if ($reviewerRole === RoleName::Hod) {
+                Route::livewire('announcements', AdminAnnouncementsIndex::class)->name('announcements.index');
+            }
         });
 }
 
