@@ -291,6 +291,14 @@ class Show extends Component
         $this->authorize('close', $this->application);
         $this->guardNotFinal();
 
+        $closingMessage = trim($this->message_body);
+
+        if ($closingMessage !== '') {
+            $closingMessage = $this->validate([
+                'message_body' => ['required', 'string', 'max:'.self::MESSAGE_MAX_LENGTH],
+            ])['message_body'];
+        }
+
         $this->cancelOpenRequestIfAny();
 
         $from = $this->application->status->value;
@@ -299,6 +307,17 @@ class Show extends Component
             'status' => ApplicationStatus::Closed,
             'closed_at' => now(),
         ]);
+
+        if ($closingMessage !== '') {
+            ApplicationMessage::create([
+                'application_id' => $this->application->id,
+                'sender_id' => Auth::id(),
+                'type' => MessageType::Message,
+                'body' => $closingMessage,
+            ]);
+
+            $this->message_body = '';
+        }
 
         ApplicationEvent::create([
             'application_id' => $this->application->id,
@@ -311,7 +330,7 @@ class Show extends Component
 
         unset($this->timeline, $this->hasOpenRequest);
 
-        $this->application->student->user->notify(new ApplicationClosed($this->application));
+        $this->application->student->user->notify(new ApplicationClosed($this->application, $closingMessage ?: null));
 
         $this->modal('confirm-close')->close();
         Flux::toast(variant: 'success', text: __('Application closed.'));

@@ -3,9 +3,12 @@
 use App\Enums\ApplicationStatus;
 use App\Enums\MessageType;
 use App\Livewire\Admin\Applications\Show;
+use App\Livewire\Student\Applications\Show as StudentShow;
 use App\Models\ApplicationEvent;
 use App\Models\ApplicationMessage;
 use App\Models\Department;
+use App\Notifications\ApplicationClosed;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -172,4 +175,32 @@ test('resolving, rejecting or closing while a request is open automatically canc
 
         expect($request->refresh()->cancelled_at)->not->toBeNull();
     }
+});
+
+test('a message typed while closing an application is saved and sent with the closure notification', function () {
+    Notification::fake();
+
+    $department = Department::factory()->create();
+    $admin = createAdminOfficer($department);
+    $student = createStudentUser($department);
+    $application = createApplicationInDepartment($department, $student);
+    $application->update(['status' => ApplicationStatus::Resolved, 'resolved_at' => now()]);
+
+    Livewire::actingAs($admin)
+        ->test(Show::class, ['application' => $application])
+        ->set('message_body', 'Your fee has been adjusted.')
+        ->call('close')
+        ->assertHasNoErrors();
+
+    expect($application->messages()->where('body', 'Your fee has been adjusted.')->count())->toBe(1);
+
+    Notification::assertSentTo(
+        $student,
+        ApplicationClosed::class,
+        fn (ApplicationClosed $notification) => $notification->body === 'Your fee has been adjusted.',
+    );
+
+    Livewire::actingAs($student)
+        ->test(StudentShow::class, ['application' => $application])
+        ->assertSee('Your fee has been adjusted.');
 });
