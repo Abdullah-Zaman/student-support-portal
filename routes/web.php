@@ -7,6 +7,7 @@ use App\Http\Controllers\ApplicationAttachmentController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\CorrespondenceAttachmentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PublicTimetableController;
 use App\Http\Controllers\Student\AnnouncementAcknowledgementController;
 use App\Http\Controllers\Student\DashboardController as StudentDashboardController;
 use App\Http\Controllers\SuperAdmin\DashboardController as SuperAdminDashboardController;
@@ -47,7 +48,12 @@ use App\Livewire\SuperAdmin\Users\CreateTest as SuperAdminCreateTestUser;
 use App\Livewire\Support\Create as SupportCreate;
 use App\Livewire\Support\Index as SupportIndex;
 use App\Livewire\Support\Show as SupportShow;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', function () {
     return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
@@ -57,6 +63,11 @@ Route::get('/', function () {
  * Google OAuth for staff: sign in (guests) and connecting Gmail (staff;
  * the controller authorizes). Both come back through one callback URL.
  */
+Route::get('timetable/{token}', [PublicTimetableController::class, 'show'])
+    ->middleware('throttle:60,1')
+    ->withoutMiddleware([EncryptCookies::class, AddQueuedCookiesToResponse::class, StartSession::class, ShareErrorsFromSession::class, PreventRequestForgery::class])
+    ->name('public.timetable');
+
 Route::get('auth/google/login', [GoogleAuthController::class, 'login'])
     ->middleware(['guest', 'throttle:10,1'])
     ->name('google.login');

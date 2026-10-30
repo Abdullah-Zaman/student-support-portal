@@ -3,6 +3,10 @@
 
     <livewire:admin.timetables.explorer :department-id="$department_id" />
 
+    @if ($this->isSuperAdmin === false || $department_id !== '')
+        <livewire:admin.timetables.share-card :department-id="$department_id" />
+    @endif
+
     <x-card>
         <form
             wire:submit="uploadTimetable"
