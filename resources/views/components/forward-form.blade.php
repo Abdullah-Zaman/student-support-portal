@@ -20,7 +20,7 @@
     @if (collect($options)->filter(fn ($reason) => $reason === null)->isEmpty())
         <p class="m-0 text-sm text-subtle">{{ __('There is no one to forward this application to right now.') }}</p>
     @else
-        <flux:select wire:model="forward_target" :label="__('Forward to')">
+        <flux:select wire:model.live="forward_target" :label="__('Forward to')">
             <flux:select.option value="">{{ __('Choose…') }}</flux:select.option>
             @foreach ($options as $value => $reason)
                 @if ($reason === null)
@@ -28,6 +28,22 @@
                 @endif
             @endforeach
         </flux:select>
+
+        @if ($this->forward_target === \App\Enums\ForwardTarget::Office->value)
+            <flux:select wire:model.live="forward_office_id" :label="__('Office')">
+                <flux:select.option value="">{{ __('Choose…') }}</flux:select.option>
+                @foreach ($this->forwardOffices as $office)
+                    <flux:select.option :value="(string) $office->id">{{ $office->name }}</flux:select.option>
+                @endforeach
+            </flux:select>
+
+            <flux:select wire:model="forward_contact_id" :label="__('Contact')" :disabled="$this->forwardContacts->isEmpty()">
+                <flux:select.option value="">{{ __('Choose…') }}</flux:select.option>
+                @foreach ($this->forwardContacts as $contact)
+                    <flux:select.option :value="(string) $contact->id">{{ $contact->name }}{{ $contact->designation ? ' — '.$contact->designation : '' }}</flux:select.option>
+                @endforeach
+            </flux:select>
+        @endif
 
         <flux:textarea wire:model="forward_note" :label="__('Note')" rows="3" maxlength="1000" :placeholder="__('Why you are forwarding it and what you need.')" />
 

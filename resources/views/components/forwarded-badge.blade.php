@@ -9,6 +9,7 @@
             \App\Enums\ForwardTarget::Hod => ['arrow-uturn-right', 'bg-[#EFE7F7] text-[#5B3A86]'],
             \App\Enums\ForwardTarget::Dean => ['arrow-uturn-right', 'bg-[#E3EEFB] text-[#1D4F8A]'],
             \App\Enums\ForwardTarget::Registrar => ['paper-airplane', 'bg-[#E4F4F4] text-[#1E5F60]'],
+            \App\Enums\ForwardTarget::Office => ['paper-airplane', 'bg-[#E4F4F4] text-[#1E5F60]'],
         };
     @endphp
 

@@ -35,7 +35,7 @@ use RuntimeException;
 class PostCorrespondence
 {
     /**
-     * @param  array{type: CorrespondenceType, from_party: CorrespondenceParty, from_user_id: int|null, from_email?: string|null, to_party: CorrespondenceParty, to_user_id: int|null, to_email?: string|null, remark_type?: RemarkType|null, body: string|null}  $attributes
+     * @param  array{type: CorrespondenceType, from_party: CorrespondenceParty, from_user_id: int|null, from_email?: string|null, to_party: CorrespondenceParty, to_user_id: int|null, to_email?: string|null, office_contact_id?: int|null, to_name?: string|null, to_designation?: string|null, to_office_name?: string|null, remark_type?: RemarkType|null, body: string|null}  $attributes
      * @param  array<int, UploadedFile>  $files
      * @param  (Closure(CorrespondenceMessage): void)|null  $alsoInTransaction  further writes that belong with a new message
      */
@@ -110,7 +110,7 @@ class PostCorrespondence
                 ?? User::adminOfficersInDepartment($application->department_id)->first(),
             CorrespondenceParty::Hod => User::activeHodForDepartment($application->department_id),
             CorrespondenceParty::Dean => User::activeDeanForFaculty($application->department?->faculty_id),
-            CorrespondenceParty::Registrar => null,
+            CorrespondenceParty::Registrar, CorrespondenceParty::Office => null,
         };
     }
 

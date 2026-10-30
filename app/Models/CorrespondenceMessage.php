@@ -31,6 +31,10 @@ use Spatie\Activitylog\Support\LogOptions;
  * @property CorrespondenceParty $to_party
  * @property int|null $to_user_id
  * @property string|null $to_email
+ * @property int|null $office_contact_id
+ * @property string|null $to_name
+ * @property string|null $to_designation
+ * @property string|null $to_office_name
  * @property RemarkType|null $remark_type
  * @property string|null $body
  * @property CorrespondenceEmailStatus $email_status
@@ -63,6 +67,10 @@ class CorrespondenceMessage extends Model
         'to_party',
         'to_user_id',
         'to_email',
+        'office_contact_id',
+        'to_name',
+        'to_designation',
+        'to_office_name',
         'remark_type',
         'body',
         'email_status',
@@ -94,7 +102,7 @@ class CorrespondenceMessage extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['application_id', 'conversation_id', 'type', 'from_party', 'to_party', 'remark_type', 'email_status'])
+            ->logOnly(['application_id', 'conversation_id', 'type', 'from_party', 'to_party', 'office_contact_id', 'to_email', 'remark_type', 'email_status'])
             ->logOnlyDirty();
     }
 
@@ -192,6 +200,10 @@ class CorrespondenceMessage extends Model
     {
         if ($this->to_user_id !== null) {
             return $this->recipient->name;
+        }
+
+        if ($this->to_name !== null) {
+            return $this->to_name.($this->to_office_name !== null ? ' ('.$this->to_office_name.')' : '');
         }
 
         return $this->to_email ?? $this->to_party->label();

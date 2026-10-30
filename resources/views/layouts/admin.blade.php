@@ -202,6 +202,19 @@
                     {{ __('Timetable') }}
                 </flux:sidebar.item>
 
+                @can('viewAny', \App\Models\Office::class)
+                    <flux:sidebar.item
+                        icon="building-office-2"
+                        :href="route('admin.offices.index')"
+                        :current="request()->routeIs('admin.offices.*')"
+                        wire:navigate
+                        :class="$navItemClass"
+                        data-test="sidebar-offices"
+                    >
+                        {{ __('Offices') }}
+                    </flux:sidebar.item>
+                @endcan
+
                 @endunless
 
                 <flux:sidebar.item

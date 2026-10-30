@@ -13,6 +13,7 @@ enum CorrespondenceParty: string
     case Hod = 'hod';
     case Dean = 'dean';
     case Registrar = 'registrar';
+    case Office = 'office';
 
     /**
      * The party a staff member writes as. The Super Admin only reads
@@ -35,6 +36,7 @@ enum CorrespondenceParty: string
             ForwardTarget::Hod => self::Hod,
             ForwardTarget::Dean => self::Dean,
             ForwardTarget::Registrar => self::Registrar,
+            ForwardTarget::Office => self::Office,
         };
     }
 
@@ -49,6 +51,7 @@ enum CorrespondenceParty: string
             self::Hod => 2,
             self::Dean => 3,
             self::Registrar => 4,
+            self::Office => 5,
         };
     }
 
@@ -68,6 +71,7 @@ enum CorrespondenceParty: string
             self::Hod => 'HOD',
             self::Dean => 'Dean',
             self::Registrar => 'Registrar',
+            self::Office => 'Office',
         };
     }
 
@@ -81,7 +85,15 @@ enum CorrespondenceParty: string
             self::AdminOfficer => 'admin.applications.show',
             self::Hod => 'hod.applications.show',
             self::Dean => 'dean.applications.show',
-            self::Registrar => null,
+            self::Registrar, self::Office => null,
         };
+    }
+
+    /**
+     * Parties with no portal account, reached only by email.
+     */
+    public function isExternal(): bool
+    {
+        return $this === self::Registrar || $this === self::Office;
     }
 }

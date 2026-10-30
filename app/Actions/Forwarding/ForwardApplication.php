@@ -10,6 +10,8 @@ use App\Enums\ForwardTarget;
 use App\Models\Application;
 use App\Models\ApplicationEvent;
 use App\Models\CorrespondenceMessage;
+use App\Models\Office;
+use App\Models\OfficeContact;
 use App\Models\Setting;
 use App\Models\User;
 use App\Notifications\ApplicationForwardedForReview;
@@ -37,8 +39,16 @@ class ForwardApplication
      * Why a forward to this target is not possible right now (no active
      * HOD or Dean, or no Registrar email), or null when it is.
      */
-    public function unavailableReason(Application $application, ForwardTarget $target): ?string
+    public function unavailableReason(Application $application, ForwardTarget $target, ?User $sender = null): ?string
     {
+        if ($target === ForwardTarget::Office) {
+            if ($this->hasSelectableOffice($application, $sender)) {
+                return null;
+            }
+
+            return __('No office with an active contact is available to you.');
+        }
+
         $isAvailable = match ($target) {
             ForwardTarget::AdminOfficer => User::adminOfficersInDepartment($application->department_id)->isNotEmpty(),
             ForwardTarget::Hod => User::activeHodForDepartment($application->department_id) !== null,
@@ -58,12 +68,21 @@ class ForwardApplication
         };
     }
 
+    private function hasSelectableOffice(Application $application, ?User $sender): bool
+    {
+        return $sender !== null
+            && Office::query()
+                ->selectableBy($sender, $application->department_id)
+                ->whereHas('contacts', fn ($query) => $query->where('is_active', true))
+                ->exists();
+    }
+
     /**
      * @throws ValidationException when the target has no recipient
      */
-    public function handle(Application $application, User $sender, ForwardTarget $target, string $note, string $idempotencyKey): CorrespondenceMessage
+    public function handle(Application $application, User $sender, ForwardTarget $target, string $note, string $idempotencyKey, ?OfficeContact $contact = null): CorrespondenceMessage
     {
-        $reason = $this->unavailableReason($application, $target);
+        $reason = $this->unavailableReason($application, $target, $sender);
 
         if ($reason !== null) {
             throw ValidationException::withMessages(['forward_target' => $reason]);
@@ -81,6 +100,8 @@ class ForwardApplication
             throw ValidationException::withMessages(['forward_target' => __('You cannot forward an application to yourself.')]);
         }
 
+        $officeAttributes = $target === ForwardTarget::Office ? $this->officeAttributes($sender, $application, $contact) : [];
+
         $recipient = $this->post->recipientFor($application, $toParty, $fromParty);
 
         $forward = $this->post->handle($application, $sender, [
@@ -90,9 +111,12 @@ class ForwardApplication
             'to_party' => $toParty,
             'to_user_id' => $recipient?->id,
             'to_email' => $target === ForwardTarget::Registrar ? self::registrarEmail() : null,
+            ...$officeAttributes,
             'body' => $note,
         ], $idempotencyKey, alsoInTransaction: function (CorrespondenceMessage $forward) use ($application, $sender, $fromParty, $target) {
-            $application->update(['forwarded_to' => $target === ForwardTarget::AdminOfficer ? null : $target]);
+            if ($target !== ForwardTarget::Office) {
+                $application->update(['forwarded_to' => $target === ForwardTarget::AdminOfficer ? null : $target]);
+            }
 
             ApplicationEvent::create([
                 'application_id' => $application->id,
@@ -100,7 +124,7 @@ class ForwardApplication
                 'event_type' => ApplicationEventType::Forwarded,
                 'from_value' => $fromParty->value,
                 'to_value' => $target->value,
-                'visible_to_student' => $target !== ForwardTarget::AdminOfficer,
+                'visible_to_student' => ! in_array($target, [ForwardTarget::AdminOfficer, ForwardTarget::Office], true),
             ]);
         });
 
@@ -108,7 +132,15 @@ class ForwardApplication
             return $forward;
         }
 
-        if ($target !== ForwardTarget::AdminOfficer) {
+        if ($target === ForwardTarget::Office) {
+            activity()
+                ->causedBy($sender)
+                ->performedOn($forward)
+                ->withProperties(['application_id' => $application->id, 'office' => $forward->to_office_name, 'to_email' => $forward->to_email])
+                ->log('forwarded to office');
+        }
+
+        if (! in_array($target, [ForwardTarget::AdminOfficer, ForwardTarget::Office], true)) {
             $application->student->user->notify(new ApplicationForwardedForReview($application, $target));
         }
 
@@ -117,6 +149,35 @@ class ForwardApplication
         }
 
         return $forward;
+    }
+
+    /**
+     * The chosen contact, as a copy of its name, designation, email and
+     * office so later edits never change the record. The contact must be
+     * active, in an active office of the application's department that
+     * this sender may use.
+     *
+     * @return array{office_contact_id: int, to_name: string, to_designation: string|null, to_office_name: string, to_email: string}
+     *
+     * @throws ValidationException
+     */
+    private function officeAttributes(User $sender, Application $application, ?OfficeContact $contact): array
+    {
+        $office = $contact?->is_active
+            ? Office::query()->selectableBy($sender, $application->department_id)->whereKey($contact->office_id)->first()
+            : null;
+
+        if ($contact === null || $office === null) {
+            throw ValidationException::withMessages(['forward_contact_id' => __('Choose an available office and contact.')]);
+        }
+
+        return [
+            'office_contact_id' => $contact->id,
+            'to_name' => $contact->name,
+            'to_designation' => $contact->designation,
+            'to_office_name' => $office->name,
+            'to_email' => $contact->email,
+        ];
     }
 
     public static function registrarEmail(): ?string

@@ -112,6 +112,11 @@ class CorrespondenceConversation extends Model
         return $this->party_a === $party ? $this->party_b : $this->party_a;
     }
 
+    public function isExternal(): bool
+    {
+        return $this->party_a->isExternal() || $this->party_b->isExternal();
+    }
+
     public function isWithRegistrar(): bool
     {
         return $this->involves(CorrespondenceParty::Registrar);

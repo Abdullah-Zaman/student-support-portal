@@ -8,6 +8,7 @@ enum ForwardTarget: string
     case Hod = 'hod';
     case Dean = 'dean';
     case Registrar = 'registrar';
+    case Office = 'office';
 
     /**
      * Where each role may forward an application: to any of the other
@@ -20,9 +21,9 @@ enum ForwardTarget: string
     public static function allowedFrom(RoleName $role): array
     {
         return match ($role) {
-            RoleName::AdminOfficer => [self::Hod, self::Dean, self::Registrar],
-            RoleName::Hod => [self::AdminOfficer, self::Dean, self::Registrar],
-            RoleName::Dean => [self::AdminOfficer, self::Hod, self::Registrar],
+            RoleName::AdminOfficer => [self::Hod, self::Dean, self::Registrar, self::Office],
+            RoleName::Hod => [self::AdminOfficer, self::Dean, self::Registrar, self::Office],
+            RoleName::Dean => [self::AdminOfficer, self::Hod, self::Registrar, self::Office],
             default => [],
         };
     }
@@ -34,6 +35,7 @@ enum ForwardTarget: string
             self::Hod => 'HOD',
             self::Dean => 'Dean',
             self::Registrar => 'Registrar',
+            self::Office => 'Office',
         };
     }
 
@@ -47,6 +49,7 @@ enum ForwardTarget: string
             self::Hod => 'With HOD',
             self::Dean => 'With Dean',
             self::Registrar => 'Sent to Registrar',
+            self::Office => 'Sent to office',
         };
     }
 
@@ -60,7 +63,7 @@ enum ForwardTarget: string
             self::AdminOfficer => RoleName::AdminOfficer,
             self::Hod => RoleName::Hod,
             self::Dean => RoleName::Dean,
-            self::Registrar => null,
+            self::Registrar, self::Office => null,
         };
     }
 }

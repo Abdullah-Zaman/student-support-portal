@@ -18,12 +18,12 @@ class CorrespondenceConversationPolicy
     }
 
     /**
-     * Write in a portal conversation (not the Registrar's, which is
-     * email-only) until the application is closed or rejected.
+     * Write in a portal conversation (not the Registrar's or an office's,
+     * which are email-only) until the application is closed or rejected.
      */
     public function reply(User $user, CorrespondenceConversation $conversation): bool
     {
-        return ! $conversation->isWithRegistrar()
+        return ! $conversation->isExternal()
             && ! $conversation->application->isFinal()
             && $this->view($user, $conversation);
     }

@@ -16,6 +16,7 @@ use App\Http\Middleware\RequireAnnouncementAcknowledgement;
 use App\Livewire\Admin\Announcements\Index as AdminAnnouncementsIndex;
 use App\Livewire\Admin\Applications\Index as AdminApplicationsIndex;
 use App\Livewire\Admin\Applications\Show as AdminApplicationsShow;
+use App\Livewire\Admin\Offices\Index as AdminOfficesIndex;
 use App\Livewire\Admin\Students\Index as AdminStudentsIndex;
 use App\Livewire\Admin\Students\Show as AdminStudentsShow;
 use App\Livewire\Admin\Timetables\Index as AdminTimetablesIndex;
@@ -133,6 +134,8 @@ Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value])
 
         Route::livewire('timetable', AdminTimetablesIndex::class)->name('timetable.index');
         Route::livewire('timetable/{version}', AdminTimetablesShow::class)->name('timetable.show');
+
+        Route::livewire('offices', AdminOfficesIndex::class)->name('offices.index');
     });
 
 Route::middleware(['auth', 'verified', 'role:'.RoleName::AdminOfficer->value.'|'.RoleName::Hod->value.'|'.RoleName::Dean->value])
