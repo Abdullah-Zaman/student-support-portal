@@ -28,6 +28,21 @@ class TimetableVersionPolicy
             && $user->department_id === $version->department_id;
     }
 
+    /**
+     * The read-only search and statistics over a department's published
+     * timetable: that department's Admin Officer, or Super Admin.
+     */
+    public function explore(User $user, ?int $departmentId): bool
+    {
+        if ($user->hasRole(RoleName::SuperAdmin->value)) {
+            return true;
+        }
+
+        return $user->hasRole(RoleName::AdminOfficer->value)
+            && $departmentId !== null
+            && $user->department_id === $departmentId;
+    }
+
     public function create(User $user): bool
     {
         return $this->viewAny($user);

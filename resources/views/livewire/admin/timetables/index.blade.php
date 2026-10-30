@@ -1,6 +1,8 @@
 <div class="flex flex-col gap-6 py-7">
     <x-page-header :title="__('Timetable')" :subtitle="__('Upload the department timetable (.xlsx), check the preview, then publish it to students.')" />
 
+    <livewire:admin.timetables.explorer :department-id="$department_id" />
+
     <x-card>
         <form
             wire:submit="uploadTimetable"
